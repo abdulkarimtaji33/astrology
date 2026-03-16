@@ -1,0 +1,26 @@
+import BirthDataForm from '@/components/BirthDataForm';
+
+export default function Home() {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950/80 to-slate-950">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-30"
+        style={{
+          backgroundImage: `radial-gradient(circle at 20% 80%, rgba(251,191,36,0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(99,102,241,0.2) 0%, transparent 50%)`,
+        }}
+      />
+      <main className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12 sm:px-6">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Birth Chart
+          </h1>
+          <p className="mt-2 text-white/70">
+            Enter your birth details to continue
+          </p>
+        </div>
+        <BirthDataForm />
+      </main>
+    </div>
+  );
+}

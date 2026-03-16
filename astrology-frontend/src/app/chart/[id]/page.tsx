@@ -1,0 +1,120 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import api from '@/lib/api';
+import LagnaChartSVG from '@/components/LagnaChartSVG';
+import PlanetTable from '@/components/PlanetTable';
+
+interface PlanetPosition {
+  planet: string;
+  longitude: number;
+  sign: string;
+  signIndex: number;
+  degreeInSign: number;
+  house: number;
+  isRetrograde: boolean;
+  dignity: 'own' | 'exalted' | 'debilitated' | 'neutral';
+}
+
+interface HouseInfo {
+  house: number;
+  sign: string;
+  signIndex: number;
+  planets: string[];
+}
+
+export interface ChartData {
+  lagna: {
+    longitude: number;
+    sign: string;
+    signIndex: number;
+    degreeInSign: number;
+  };
+  planets: PlanetPosition[];
+  houses: HouseInfo[];
+  ayanamsa: number;
+  julianDay: number;
+}
+
+export default function ChartPage() {
+  const { id } = useParams<{ id: string }>();
+  const [chart, setChart] = useState<ChartData | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .get<ChartData>(`/birth-records/${id}/chart`)
+      .then((r) => setChart(r.data))
+      .catch(() => setError('Failed to load chart. Please go back and try again.'));
+  }, [id]);
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950/80 to-slate-950">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-30"
+        style={{
+          backgroundImage: `radial-gradient(circle at 20% 80%, rgba(251,191,36,0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(99,102,241,0.2) 0%, transparent 50%)`,
+        }}
+      />
+      <main className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              Vedic Birth Chart
+            </h1>
+            <p className="mt-1 text-sm text-white/50">
+              Lagna (D1) · Lahiri Ayanamsa · Equal Houses
+            </p>
+          </div>
+          <a
+            href="/"
+            className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/70 transition hover:bg-white/10"
+          >
+            ← New Chart
+          </a>
+        </div>
+
+        {error && (
+          <p className="rounded-xl bg-red-500/20 p-4 text-red-200">{error}</p>
+        )}
+
+        {!chart && !error && (
+          <div className="flex items-center justify-center py-32">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-400 border-t-transparent" />
+          </div>
+        )}
+
+        {chart && (
+          <div className="flex flex-col gap-8 lg:flex-row">
+            {/* Chart */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-md sm:max-w-md">
+                <LagnaChartSVG chart={chart} />
+              </div>
+              {/* Lagna info */}
+              <div className="w-full max-w-sm rounded-xl border border-white/10 bg-white/5 px-5 py-4 sm:max-w-md">
+                <p className="text-xs font-medium uppercase tracking-widest text-white/40">Lagna</p>
+                <p className="mt-1 text-lg font-semibold text-amber-300">
+                  {chart.lagna.sign}
+                  <span className="ml-2 text-sm font-normal text-white/60">
+                    {chart.lagna.degreeInSign.toFixed(2)}°
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-white/40">
+                  Ayanamsa: {chart.ayanamsa.toFixed(4)}°
+                </p>
+              </div>
+            </div>
+
+            {/* Planet table */}
+            <div className="flex-1">
+              <PlanetTable planets={chart.planets} />
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
