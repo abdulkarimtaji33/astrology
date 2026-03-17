@@ -8,7 +8,7 @@ interface PlanetPosition {
   degreeInSign: number;
   house: number;
   isRetrograde: boolean;
-  dignity: 'own' | 'exalted' | 'debilitated' | 'neutral';
+  dignity: string[];
 }
 
 const DIGNITY_BADGE: Record<string, string> = {
@@ -63,11 +63,15 @@ export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) 
                 </td>
                 <td className="px-3 py-2.5 tabular-nums text-white/60">{p.house}</td>
                 <td className="px-3 py-2.5">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs capitalize ${DIGNITY_BADGE[p.dignity]}`}
-                  >
-                    {p.dignity}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {(Array.isArray(p.dignity) ? p.dignity : [p.dignity]).map(d => (
+                      <span key={d}
+                        className={`rounded-full px-2 py-0.5 text-xs capitalize ${DIGNITY_BADGE[d] ?? 'bg-white/10 text-white/50'}`}
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
                 </td>
               </tr>
             ))}

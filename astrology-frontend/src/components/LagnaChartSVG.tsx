@@ -31,7 +31,10 @@ function buildContent(chart: ChartData) {
     const abbr = PLANET_ABBR[p.planet] ?? p.planet.slice(0,2);
     const ret  = p.isRetrograde ? 'ᴿ' : '';
     const deg  = Math.floor(p.degreeInSign)+'°';
-    content[p.house].push({ label:`${abbr}${ret} ${deg}`, color: DIGNITY_COLOR[p.dignity] });
+    const dignityKey = p.dignity.includes('exalted') ? 'exalted'
+      : p.dignity.includes('debilitated') ? 'debilitated'
+      : p.dignity.includes('own') ? 'own' : 'neutral';
+    content[p.house].push({ label:`${abbr}${ret} ${deg}`, color: DIGNITY_COLOR[dignityKey] });
   }
   return content;
 }

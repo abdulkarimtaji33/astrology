@@ -73,11 +73,12 @@ const DEBILITATION: Partial<Record<PlanetName, string>> = {
 // ─── helpers ────────────────────────────────────────────────────────────
 function norm360(x: number) { return ((x % 360) + 360) % 360; }
 
-function getDignity(planet: PlanetName, sign: SignName): 'own' | 'exalted' | 'debilitated' | 'neutral' {
-  if (SIGN_LORDS[sign] === planet) return 'own';
-  if (EXALTATION[planet] === sign) return 'exalted';
-  if (DEBILITATION[planet] === sign) return 'debilitated';
-  return 'neutral';
+function getDignity(planet: PlanetName, sign: SignName): string[] {
+  const result: string[] = [];
+  if (EXALTATION[planet] === sign) result.push('exalted');
+  if (DEBILITATION[planet] === sign) result.push('debilitated');
+  if (SIGN_LORDS[sign] === planet) result.push('own');
+  return result.length > 0 ? result : ['neutral'];
 }
 
 /**
@@ -116,7 +117,7 @@ export interface PlanetPosition {
   degreeInSign: number;
   house: number;
   isRetrograde: boolean;
-  dignity: 'own' | 'exalted' | 'debilitated' | 'neutral';
+  dignity: string[];
 }
 
 export interface LagnaChart {
