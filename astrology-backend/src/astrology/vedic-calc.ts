@@ -245,3 +245,54 @@ export function calculateChart(
     utcOffsetHours: utc.utcOffsetHours,
   };
 }
+
+// ─── transit calculation ─────────────────────────────────────────────────────
+/**
+ * Calculate sidereal planetary positions for a given UTC date (at noon).
+ * Houses are mapped relative to lagnaSignIndex if supplied (≥ 0), otherwise house = 0.
+ */
+export function calculateTransitPlanets(
+  year: number, month: number, day: number,
+  lagnaSignIndex = -1,
+): PlanetPosition[] {
+  const jd = swe.swe_julday(year, month, day, 12.0, 1 /* Gregorian */);
+  swe.swe_set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+  const flags = swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED;
+  const positions: PlanetPosition[] = [];
+
+  for (const planet of PLANETS) {
+    let longitude: number;
+    let speed: number;
+
+    if (planet === 'Ketu') {
+      const rahu = positions.find(p => p.planet === 'Rahu')!;
+      longitude = norm360(rahu.longitude + 180);
+      speed = 0;
+    } else {
+      const sweId = SWE_ID[planet];
+      const result = swe.swe_calc_ut(jd, sweId, flags);
+      if (result.error) throw new Error(`swe_calc_ut ${planet}: ${result.error}`);
+      longitude = result.longitude;
+      speed = result.longitudeSpeed;
+    }
+
+    const signIndex = Math.floor(longitude / 30);
+    const sign = SIGNS[signIndex];
+    const degreeInSign = longitude % 30;
+    const isRetrograde = planet === 'Rahu' || planet === 'Ketu' ? true : speed < 0;
+    const house = lagnaSignIndex >= 0 ? ((signIndex - lagnaSignIndex + 12) % 12) + 1 : 0;
+
+    positions.push({
+      planet,
+      longitude,
+      sign,
+      signIndex,
+      degreeInSign,
+      house,
+      isRetrograde,
+      dignity: getDignity(planet, sign),
+    });
+  }
+
+  return positions;
+}
