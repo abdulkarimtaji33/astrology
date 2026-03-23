@@ -1,7 +1,5 @@
 'use client';
 
-import type { ChartData } from '@/app/chart/[id]/page';
-
 // ─── Shared helpers ────────────────────────────────────────────────────────
 type Pt = [number, number];
 
@@ -24,7 +22,21 @@ function centroid(poly: Pt[]): Pt {
   return [poly.reduce((s,[x])=>s+x,0)/n, poly.reduce((s,[,y])=>s+y,0)/n];
 }
 
-function buildContent(chart: ChartData) {
+// ─── Public minimal shape ──────────────────────────────────────────────────
+/** Minimal chart shape needed to render the diamond chart SVG. */
+export interface ChartShape {
+  lagna: { sign: string };
+  houses: { sign: string }[];
+  planets: {
+    planet: string;
+    house: number;
+    degreeInSign: number;
+    isRetrograde: boolean;
+    dignity: string[];
+  }[];
+}
+
+function buildContent(chart: ChartShape) {
   const content: Record<number, {label:string; color:string}[]> = {};
   for (let h=1;h<=12;h++) content[h]=[];
   for (const p of chart.planets) {
@@ -49,7 +61,6 @@ function HouseCell({
 }) {
   const [cx, cy] = centroid(poly);
   const lineH = 13;
-  // stack: house#, sign, planets
   const totalLines = 1 + items.length;
   const startY = cy - ((totalLines - 1) * lineH) / 2 - 6;
 
@@ -61,19 +72,16 @@ function HouseCell({
         stroke={isLagna ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.18)'}
         strokeWidth="0.8"
       />
-      {/* house number */}
       <text x={cx} y={startY}
         textAnchor="middle" fill="rgba(255,255,255,0.22)"
         fontSize="8.5" fontFamily="system-ui,sans-serif">
         {house}
       </text>
-      {/* sign */}
       <text x={cx} y={startY + lineH}
         textAnchor="middle" fill="rgba(165,180,252,0.85)"
         fontSize="10" fontWeight="500" fontFamily="system-ui,sans-serif">
         {SIGN_ABBR[sign] ?? sign}
       </text>
-      {/* planets */}
       {items.map(({label,color},i) => (
         <text key={i} x={cx} y={startY + lineH * (2+i)}
           textAnchor="middle" fill={color}
@@ -86,54 +94,36 @@ function HouseCell({
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  North Indian diamond chart: inner kites + outer triangles
+//  North Indian diamond chart
 // ══════════════════════════════════════════════════════════════════════════
-//
-//  The outer square has both diagonals drawn (the X).
-//  A diamond T–R–B–L connects the midpoints of each side.
-//  Together they create:
-//    • 4 inner kite cells  (H1 top, H4 left, H7 bottom, H10 right)
-//    • 8 outer triangles   (H2,H3 TL corner; H12,H11 TR; H5,H6 BL; H8,H9 BR)
-//
-//  Houses go counter-clockwise from H1 at top:
-//    1→2→3→4→5→6→7→8→9→10→11→12
-//
-function DiamondChart({ chart }: { chart: ChartData }) {
+export function DiamondChart({ chart }: { chart: ChartShape }) {
   const SIZE = 420;
-  const C  = SIZE / 2;          // 210 — center
-  // midpoints of sides
+  const C  = SIZE / 2;
   const T: Pt  = [C, 0];
   const R: Pt  = [SIZE, C];
   const B: Pt  = [C, SIZE];
   const L: Pt  = [0, C];
-  // corner outer square
   const TL: Pt = [0, 0];
   const TR: Pt = [SIZE, 0];
   const BR: Pt = [SIZE, SIZE];
   const BL: Pt = [0, SIZE];
-  // intersection of outer diagonals with inner diamond edges
-  const q1: Pt = [C/2, C/2];           // 105, 105
-  const q2: Pt = [SIZE-C/2, C/2];      // 315, 105
-  const q3: Pt = [SIZE-C/2, SIZE-C/2]; // 315, 315
-  const q4: Pt = [C/2, SIZE-C/2];      // 105, 315
-  const MC: Pt = [C, C];               // center 210, 210
+  const q1: Pt = [C/2, C/2];
+  const q2: Pt = [SIZE-C/2, C/2];
+  const q3: Pt = [SIZE-C/2, SIZE-C/2];
+  const q4: Pt = [C/2, SIZE-C/2];
+  const MC: Pt = [C, C];
 
   const POLYS: Record<number, Pt[]> = {
-    // inner kite cells
     1:  [T, q2, MC, q1],
     4:  [L, q1, MC, q4],
     7:  [B, q4, MC, q3],
     10: [R, q3, MC, q2],
-    // outer corner triangles — TL corner (H2 top, H3 left)
     2:  [TL, T, q1],
     3:  [TL, q1, L],
-    // TR corner (H12 top, H11 right)
     12: [TR, T, q2],
     11: [TR, q2, R],
-    // BL corner (H5 left, H6 bottom)
     5:  [BL, L, q4],
     6:  [BL, q4, B],
-    // BR corner (H9 right, H8 bottom)
     9:  [BR, R, q3],
     8:  [BR, q3, B],
   };
@@ -143,16 +133,12 @@ function DiamondChart({ chart }: { chart: ChartData }) {
   return (
     <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" height="100%"
       style={{aspectRatio:'1/1'}} xmlns="http://www.w3.org/2000/svg">
-
       {Object.entries(POLYS).map(([hStr, poly]) => {
         const h = Number(hStr);
-        const isLagna = h === 1;
         return <HouseCell key={h} house={h} poly={poly}
           sign={chart.houses[h-1]?.sign??''} items={content[h]}
-          isLagna={isLagna} />;
+          isLagna={h === 1} />;
       })}
-
-      {/* Lagna sign label at center of H1 kite */}
       <text x={C} y={C/2 - 6} textAnchor="middle"
         fill="rgba(251,191,36,0.95)" fontSize="11" fontWeight="700"
         fontFamily="system-ui,sans-serif">
@@ -162,11 +148,7 @@ function DiamondChart({ chart }: { chart: ChartData }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  Main export
-// ══════════════════════════════════════════════════════════════════════════
-interface Props { chart: ChartData }
-
-export default function LagnaChartSVG({ chart }: Props) {
+// ─── Default export ────────────────────────────────────────────────────────
+export default function LagnaChartSVG({ chart }: { chart: ChartShape }) {
   return <DiamondChart chart={chart} />;
 }
