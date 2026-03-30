@@ -1,0 +1,9 @@
+Frontend repo (separate from backend)
+  Server:
+  cd /var/www/astrology-frontend
+  git pull
+  npm ci && npm run build
+  pm2 restart astrology-web
+
+  First-time PM2 (from backend repo path):
+  pm2 start /var/www/astrology-backend/ecosystem.config.cjs --only astrology-web
