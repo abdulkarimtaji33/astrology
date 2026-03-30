@@ -1,0 +1,18 @@
+Backend repo (this one)
+  One-time per machine: git lfs install
+  If astrology.sql was committed before LFS: git lfs migrate import --include="astrology.sql" --everything
+  Otherwise: git add .gitattributes astrology.sql && git commit && git push
+  GitHub: install "Git LFS" from git-scm.com; file is ~114MB — plain git will reject >100MB without LFS
+
+Server — backend
+  cd /var/www/astrology-backend
+  git pull && git lfs pull
+  bash scripts/import-db.sh
+  npm ci --omit=dev && npm run build
+  pm2 restart astrology-api || pm2 start ecosystem.config.cjs --only astrology-api
+
+Server — frontend (separate repo)
+  cd /var/www/astrology-frontend
+  git pull
+  npm ci && npm run build
+  pm2 restart astrology-web || pm2 start /var/www/astrology-backend/ecosystem.config.cjs --only astrology-web

@@ -1,0 +1,2 @@
+# Large dump — use Git LFS (run: git lfs install && git lfs track "astrology.sql" before first commit of this file)
+astrology.sql filter=lfs diff=lfs merge=lfs -text
