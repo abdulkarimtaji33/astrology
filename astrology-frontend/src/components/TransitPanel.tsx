@@ -4,9 +4,19 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { DiamondChart, ChartShape } from './LagnaChartSVG';
+import AiAnalysisModal, { AiAnalysisResult } from './AiAnalysisModal';
+
+interface AiAnalysisSummary {
+  id: number;
+  createdAt: string;
+  transitFrom: string;
+  transitTo: string;
+  basis: string;
+  model: string;
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface TransitPlanet {
@@ -222,6 +232,60 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
   const [dayIndex, setDayIndex]       = useState(0);
   const [view, setView]               = useState<'chart' | 'table'>('chart');
 
+  const queryClient = useQueryClient();
+
+  // AI analysis state
+  const [aiOpen, setAiOpen]           = useState(false);
+  const [aiLoading, setAiLoading]     = useState(false);
+  const [aiError, setAiError]         = useState(false);
+  const [aiData, setAiData]           = useState<AiAnalysisResult | null>(null);
+  const [aiModalPeriod, setAiModalPeriod] = useState('');
+
+  const openModal = (period: string) => {
+    setAiModalPeriod(period);
+    setAiData(null);
+    setAiError(false);
+    setAiOpen(true);
+  };
+
+  const handleAiAnalysis = async () => {
+    if (!queryParams) return;
+    openModal(`${queryParams.from} to ${queryParams.to}`);
+    setAiLoading(true);
+    try {
+      const res = await api.get<AiAnalysisResult>(
+        `/birth-records/${chartId}/ai-analysis?from=${queryParams.from}&to=${queryParams.to}&basis=${queryParams.basis}`,
+        { timeout: 120000 },
+      );
+      setAiData(res.data);
+      queryClient.invalidateQueries({ queryKey: ['ai-analyses', chartId] });
+    } catch {
+      setAiError(true);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleViewPast = async (item: AiAnalysisSummary) => {
+    openModal(`${item.transitFrom} to ${item.transitTo}`);
+    setAiLoading(true);
+    try {
+      const res = await api.get<AiAnalysisResult>(
+        `/birth-records/${chartId}/ai-analyses/${item.id}`,
+      );
+      setAiData(res.data);
+    } catch {
+      setAiError(true);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const { data: analysesList } = useQuery<AiAnalysisSummary[]>({
+    queryKey: ['ai-analyses', chartId],
+    queryFn: () => api.get<AiAnalysisSummary[]>(`/birth-records/${chartId}/ai-analyses`).then(r => r.data),
+  });
+
   const {
     register,
     handleSubmit,
@@ -259,6 +323,15 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+
+      <AiAnalysisModal
+        isOpen={aiOpen}
+        isLoading={aiLoading}
+        isError={aiError}
+        data={aiData}
+        transitPeriod={aiModalPeriod}
+        onClose={() => setAiOpen(false)}
+      />
 
       {/* ── Date range form ── */}
       <form onSubmit={handleSubmit(onSubmit)}
@@ -336,6 +409,60 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
       {/* ── Results ── */}
       {data && !isLoading && (
         <>
+          {/* Analyze with AI + history */}
+          <div className="rounded-2xl border border-violet-400/15 bg-violet-500/5 px-5 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs font-medium uppercase tracking-widest text-violet-300/50">
+                AI Analysis
+              </p>
+              <button
+                type="button"
+                onClick={handleAiAnalysis}
+                className="flex items-center gap-2 rounded-xl border border-violet-400/40 bg-violet-500/15 px-5 py-2 text-sm font-semibold text-violet-300 transition hover:bg-violet-500/25 hover:border-violet-400/60 hover:text-violet-200 active:scale-95"
+              >
+                <span className="text-base">✦</span>
+                Analyze with AI
+              </button>
+            </div>
+
+            {/* Past analyses list */}
+            {analysesList && analysesList.length > 0 && (
+              <div className="mt-4 flex flex-col gap-1.5">
+                <p className="mb-1 text-[11px] uppercase tracking-widest text-white/25">Past Analyses</p>
+                {analysesList.map(item => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-2.5"
+                  >
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="tabular-nums text-white/50">
+                        {new Date(item.createdAt).toLocaleDateString('en-GB', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                        })}{' '}
+                        <span className="text-white/30">
+                          {new Date(item.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-white/40">
+                        {item.transitFrom} → {item.transitTo}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 capitalize text-white/30">
+                        {item.basis}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleViewPast(item)}
+                      className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300 transition hover:bg-violet-500/20"
+                    >
+                      View
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Sign change summary */}
           <SignChangeSummary days={data.days} />
 

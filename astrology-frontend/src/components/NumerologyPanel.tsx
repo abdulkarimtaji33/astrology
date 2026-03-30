@@ -20,6 +20,10 @@ interface NumerologyResult {
   driverMeaning:    { title: string; keywords: string };
   conductorMeaning: { title: string; keywords: string };
   personalYearMeaning: { title: string; keywords: string };
+  name:              string;
+  nameCompound:      number;
+  nameNumber:        number;
+  nameNumberMeaning: { title: string; keywords: string };
 }
 
 // ─── Lo Shu Grid ──────────────────────────────────────────────────────────
@@ -227,6 +231,24 @@ export default function NumerologyPanel({ chartId }: { chartId: string }) {
               <p className="text-xs font-medium uppercase tracking-widest text-white/40">{item.label}</p>
             </div>
           ))}
+
+          {/* Name number (Chaldean) */}
+          <div className="flex items-center gap-5 rounded-2xl border border-violet-400/30 bg-violet-400/8 px-6 py-4">
+            <span className="text-5xl font-bold tabular-nums leading-none text-violet-300">
+              {data.nameNumber}
+            </span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-white/40">
+                Name Number · Chaldean
+              </p>
+              <p className="mt-1 text-xs text-white/25">
+                {data.name}
+                <span className="ml-2 tabular-nums text-violet-400/60">
+                  (total {data.nameCompound})
+                </span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
