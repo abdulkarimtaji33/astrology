@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import OpenAI from 'openai';
 import { CreateBirthRecordDto } from './dto/create-birth-record.dto';
 import { BirthRecord } from './birth-record.entity';
+import { AiAnalysis } from './ai-analysis.entity';
 import {
   calculateChart,
   calculateTransitPlanets,
@@ -49,6 +51,42 @@ export interface TransitResponse {
   days: TransitDayData[];
 }
 
+// ─── AI Analysis result types ────────────────────────────────────────────────
+export interface GemstoneAdvice {
+  name: string;
+  planet: string;
+  reason: string;
+}
+
+export interface TransitMetric {
+  percentage: number;
+  explanation: string;
+}
+
+export interface InvestmentMetric {
+  level: string;
+  percentage: number;
+  explanation: string;
+}
+
+export interface AiAnalysisResult {
+  lifeGeneral: string;
+  personality: string;
+  wealth: string;
+  familyLife: string;
+  marriageLife: string;
+  strongAreas: string[];
+  weakAreas: string[];
+  recommendedGemstones: GemstoneAdvice[];
+  gemstonesToAvoid: GemstoneAdvice[];
+  transitPeriod: string;
+  transitOverview: string;
+  investmentRisk: InvestmentMetric;
+  jobOpportunity: TransitMetric;
+  marriageLikelihood: TransitMetric;
+  goodHealthLikelihood: TransitMetric;
+}
+
 // ─── reference data shape ─────────────────────────────────────────────────────
 type RefData = {
   signMap: Map<string, { ruledBy: number; lord: string }>;
@@ -61,12 +99,31 @@ const PLANET_DB_ID: Record<PlanetName, number> = {
 };
 
 @Injectable()
-export class BirthRecordsService {
+export class BirthRecordsService implements OnModuleInit {
   constructor(
     @InjectRepository(BirthRecord)
     private readonly repo: Repository<BirthRecord>,
+    @InjectRepository(AiAnalysis)
+    private readonly aiRepo: Repository<AiAnalysis>,
     private readonly dataSource: DataSource,
   ) {}
+
+  async onModuleInit() {
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ai_analyses (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        birth_record_id INT NOT NULL,
+        transit_from VARCHAR(10) NOT NULL,
+        transit_to   VARCHAR(10) NOT NULL,
+        basis        VARCHAR(10) NOT NULL,
+        model        VARCHAR(50) NOT NULL,
+        prompt       LONGTEXT NOT NULL,
+        response     LONGTEXT NOT NULL,
+        created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ai_birth_record (birth_record_id)
+      )
+    `);
+  }
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
   async create(dto: CreateBirthRecordDto): Promise<BirthRecord> {
@@ -288,6 +345,236 @@ export class BirthRecordsService {
   async getNumerology(id: number, targetYear?: number): Promise<NumerologyResult> {
     const record = await this.loadRecord(id);
     const [year, month, day] = this.parseBirthDate(record);
-    return calculateNumerology(day, month, year, targetYear);
+    return calculateNumerology(day, month, year, targetYear, record.name ?? '');
+  }
+
+  // ── AI analysis ──────────────────────────────────────────────────────────
+
+  private fmtPlanets(planets: PlanetPosition[]): string {
+    return planets.map(p => {
+      const retro = p.isRetrograde ? ' (retrograde)' : '';
+      const dignity = p.dignity.length ? p.dignity.join(', ') : 'neutral';
+      return `  ${p.planet}${retro}: ${p.sign} ${p.degreeInSign.toFixed(1)}° | H${p.house} | ${dignity}`;
+    }).join('\n');
+  }
+
+  private fmtHouses(houseDetails: HouseDetail[]): string {
+    return houseDetails.map(h => {
+      const planetStr = h.planets.length
+        ? h.planets.map(p => `${p.planet}(${p.relationship}${p.isRetrograde ? ',retrograde' : ''})`).join(', ')
+        : 'empty';
+      return `  H${h.house} (${h.sign}, Lord: ${h.signLord}): ${h.mainTheme} | ${h.represents}\n    Planets: ${planetStr}`;
+    }).join('\n');
+  }
+
+  private fmtSignChanges(days: TransitDayData[]): string {
+    const planets = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Rahu','Ketu'];
+    const changes: string[] = [];
+    for (const planet of planets) {
+      let prevSign: string | null = null;
+      for (const day of days) {
+        const pos = day.planets.find(p => p.planet === planet);
+        if (!pos) continue;
+        if (prevSign !== null && pos.sign !== prevSign) {
+          changes.push(`  ${planet}: ${prevSign} → ${pos.sign} on ${day.date}`);
+        }
+        prevSign = pos.sign;
+      }
+    }
+    return changes.length ? changes.join('\n') : '  No sign changes in this period';
+  }
+
+  private buildPrompt(
+    record: BirthRecord,
+    lagna: EnrichedChart,
+    moon: EnrichedChart,
+    transit: TransitResponse,
+    numerology: NumerologyResult,
+    from: string,
+    to: string,
+    basis: 'lagna' | 'moon',
+  ): string {
+    const dateStr = record.birthDate instanceof Date
+      ? record.birthDate.toISOString().slice(0, 10)
+      : String(record.birthDate).slice(0, 10);
+
+    const missingNums = [1,2,3,4,5,6,7,8,9]
+      .filter(n => numerology.digitCount[n] === 0)
+      .join(', ') || 'none';
+
+    const planes = [
+      { name: 'Thought (4,9,2)', nums: [4,9,2] },
+      { name: 'Will (3,5,7)',    nums: [3,5,7] },
+      { name: 'Action (8,1,6)', nums: [8,1,6] },
+      { name: 'Mind (4,3,8)',   nums: [4,3,8] },
+      { name: 'Soul (9,5,1)',   nums: [9,5,1] },
+      { name: 'Physical (2,7,6)', nums: [2,7,6] },
+    ].map(p => {
+      const count = p.nums.filter(n => numerology.digitCount[n] > 0).length;
+      return `  ${p.name}: ${count}/3`;
+    }).join('\n');
+
+    const firstDay = transit.days[0];
+    const lastDay  = transit.days[transit.days.length - 1];
+
+    return `You are an expert Vedic astrologer (Jyotish) providing a factual chart reading.
+
+TONE RULES — follow these strictly:
+- Be neutral, direct, and factual. State what the chart shows, nothing more.
+- Do NOT use motivational, encouraging, or consoling language. Do not say things like "you have great potential", "opportunities await", "with effort you can overcome", or any similar phrases.
+- Do NOT soften difficult placements. If a planet is debilitated, retrograde, combust, or in an enemy sign — state it plainly and describe the realistic effect.
+- Do NOT inflate the positive. If a placement is genuinely strong, say so. If it is mixed or weak, say so.
+- Percentages must reflect the actual chart and transit quality. A difficult transit for investment should score low (10–30%). Do not default to moderate numbers to avoid seeming negative.
+- Mention specific planets, houses, signs, and dignities as evidence for every claim.
+
+BIRTH DETAILS:
+Name: ${record.name}
+Birth Date: ${dateStr}
+Birth Time: ${record.birthTime}
+Location: ${record.cityName ?? 'Unknown'} (Lat: ${record.latitude ?? 'N/A'}, Lon: ${record.longitude ?? 'N/A'})
+Timezone: ${record.timezone ?? 'Unknown'}
+
+=== LAGNA CHART (D1 – Natal Chart) ===
+Ascendant: ${lagna.lagna.sign} ${lagna.lagna.degreeInSign.toFixed(2)}°
+Ayanamsa (Lahiri): ${lagna.ayanamsa.toFixed(4)}°
+
+Planetary Positions:
+${this.fmtPlanets(lagna.planets)}
+
+House Analysis:
+${this.fmtHouses(lagna.houseDetails)}
+
+=== MOON CHART (Chandra Lagna) ===
+Moon Sign (Ascendant): ${moon.lagna.sign} ${moon.lagna.degreeInSign.toFixed(2)}°
+
+Planetary Positions (from Moon):
+${this.fmtPlanets(moon.planets)}
+
+House Analysis (from Moon):
+${this.fmtHouses(moon.houseDetails)}
+
+=== NUMEROLOGY ===
+Driver Number: ${numerology.driverNumber} – ${numerology.driverMeaning.title} (${numerology.driverMeaning.keywords})
+Conductor Number: ${numerology.conductorNumber} – ${numerology.conductorMeaning.title} (${numerology.conductorMeaning.keywords})
+Name Number (Chaldean): ${numerology.nameNumber} – ${numerology.nameNumberMeaning.title} (${numerology.nameNumberMeaning.keywords}) [Name: "${numerology.name}", Total: ${numerology.nameCompound}]
+Personal Year ${numerology.targetYear}: ${numerology.personalYear} – ${numerology.personalYearMeaning.title} (${numerology.personalYearMeaning.keywords})
+Missing Numbers from Lo Shu Grid: ${missingNums}
+Planes of Expression:
+${planes}
+
+=== TRANSIT ANALYSIS: ${from} to ${to} ===
+House Count Basis: ${basis === 'moon' ? 'Moon Sign' : 'Natal Lagna'} (${transit.natalLagna.sign})
+
+Transit Positions at Start (${from}):
+${firstDay ? this.fmtPlanets(firstDay.planets) : 'N/A'}
+
+Transit Positions at End (${to}):
+${lastDay ? this.fmtPlanets(lastDay.planets) : 'N/A'}
+
+Sign Changes During This Period:
+${this.fmtSignChanges(transit.days)}
+
+=== OUTPUT INSTRUCTIONS ===
+Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
+
+Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
+
+{
+  "lifeGeneral": "<2-3 paragraphs: life path, core karma, key patterns. Name the specific ascendant lord, its placement, and what that concretely means. Address both strengths and problems in the chart without weighting either side.>",
+  "personality": "<1-2 paragraphs: temperament and behavior patterns from Lagna and Moon sign. Include negative traits where the chart shows them — e.g. impulsiveness, rigidity, emotional difficulty, etc.>",
+  "wealth": "<1-2 paragraphs: financial picture from 2nd and 11th houses, their lords, and any relevant yogas or afflictions. State clearly if the chart shows financial struggle, instability, or restriction, and why.>",
+  "familyLife": "<1-2 paragraphs: family relationships from 4th house. Include any karmic difficulties — estrangement, loss, tension — if shown by the chart.>",
+  "marriageLife": "<1-2 paragraphs: marriage prospects from 7th house lord, Venus, and relevant transits. State delays, complications, or incompatibility indicators if present.>",
+  "strongAreas": ["<specific area supported by the chart>", ...],
+  "weakAreas": ["<specific area with chart evidence>", ...],
+  "recommendedGemstones": [
+    {"name": "<gemstone>", "planet": "<planet>", "reason": "<why this planet needs strengthening in this specific chart>"}
+  ],
+  "gemstonesToAvoid": [
+    {"name": "<gemstone>", "planet": "<planet>", "reason": "<why wearing this would aggravate this specific chart>"}
+  ],
+  "transitPeriod": "${from} to ${to}",
+  "transitOverview": "<2-3 paragraphs: factual account of major transit movements and their effects. State which houses are activated, which are stressed, and what the realistic tone of the period is — including if it is a difficult or restricted period.>",
+  "investmentRisk": {
+    "level": "<very risky | risky | neutral | good | excellent>",
+    "percentage": <integer 0–100 reflecting actual transit quality for investments — score low if 2nd/11th lords are afflicted or Saturn/Rahu are active there>,
+    "explanation": "<state which planets and houses drive this assessment>"
+  },
+  "jobOpportunity": {
+    "percentage": <integer 0–100>,
+    "explanation": "<10th house transits, Jupiter/Saturn/Sun positions and what they indicate>"
+  },
+  "marriageLikelihood": {
+    "percentage": <integer 0–100>,
+    "explanation": "<7th house transits, Venus and Jupiter positions>"
+  },
+  "goodHealthLikelihood": {
+    "percentage": <integer 0–100>,
+    "explanation": "<1st, 6th, 8th house transits, Sun/Moon/Mars positions>"
+  }
+}`;
+  }
+
+  async getAiAnalysis(
+    id: number,
+    from: string,
+    to: string,
+    basis: 'lagna' | 'moon' = 'lagna',
+    targetYear?: number,
+  ): Promise<AiAnalysisResult> {
+    if (!from || !to) throw new BadRequestException('Query params "from" and "to" are required');
+
+    const [lagnaChart, moonChart, transitData, numerology, record] = await Promise.all([
+      this.getChart(id),
+      this.getMoonChart(id),
+      this.getTransits(id, from, to, basis),
+      this.getNumerology(id, targetYear),
+      this.loadRecord(id),
+    ]);
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new BadRequestException('OPENAI_API_KEY is not configured');
+
+    const model  = 'gpt-4o';
+    const openai = new OpenAI({ apiKey });
+    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, basis);
+
+    const completion = await openai.chat.completions.create({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+      max_tokens: 4096,
+    });
+
+    const content = completion.choices[0]?.message?.content ?? '{}';
+
+    await this.aiRepo.save(
+      this.aiRepo.create({
+        birthRecordId: id,
+        transitFrom:   from,
+        transitTo:     to,
+        basis,
+        model,
+        prompt,
+        response: content,
+      }),
+    );
+
+    return JSON.parse(content) as AiAnalysisResult;
+  }
+
+  async listAiAnalyses(birthRecordId: number): Promise<AiAnalysis[]> {
+    return this.aiRepo.find({
+      where: { birthRecordId },
+      order: { createdAt: 'DESC' },
+      select: ['id', 'birthRecordId', 'transitFrom', 'transitTo', 'basis', 'model', 'createdAt'],
+    });
+  }
+
+  async getAiAnalysisById(birthRecordId: number, analysisId: number): Promise<AiAnalysisResult> {
+    const row = await this.aiRepo.findOne({ where: { id: analysisId, birthRecordId } });
+    if (!row) throw new NotFoundException(`Analysis ${analysisId} not found`);
+    return JSON.parse(row.response) as AiAnalysisResult;
   }
 }

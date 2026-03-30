@@ -23,6 +23,14 @@ export const NUMBER_MEANING: Record<number, { title: string; keywords: string }>
   9: { title: 'The Humanitarian',  keywords: 'Compassion · Completion · Universal love' },
 };
 
+// ─── Chaldean letter values ──────────────────────────────────────────────────
+// 9 is never assigned to a letter in Chaldean system
+const CHALDEAN: Record<string, number> = {
+  A:1, B:2, C:3, D:4, E:5, F:8, G:3, H:5, I:1,
+  J:1, K:2, L:3, M:4, N:5, O:7, P:8, Q:1, R:2,
+  S:3, T:4, U:6, V:6, W:6, X:5, Y:1, Z:7,
+};
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 /** Repeatedly sum digits until single digit (1–9). */
 export function reduceToSingle(n: number): number {
@@ -40,6 +48,16 @@ function birthDigits(day: number, month: number, year: number): number[] {
     .filter(d => d !== 0);
 }
 
+/** Calculate Chaldean name number. Returns compound total and reduced single digit. */
+export function calculateNameNumber(name: string): { compound: number; single: number } {
+  const total = name
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .split('')
+    .reduce((sum, ch) => sum + (CHALDEAN[ch] ?? 0), 0);
+  return { compound: total, single: reduceToSingle(total) };
+}
+
 // ─── public interfaces ────────────────────────────────────────────────────────
 export interface LoShuCell {
   number:  number;
@@ -48,15 +66,20 @@ export interface LoShuCell {
 }
 
 export interface NumerologyResult {
-  driverNumber:    number;   // psychic: reduce birth day
-  conductorNumber: number;   // destiny: reduce all birth date digits
-  personalYear:    number;   // for the given targetYear
+  driverNumber:    number;
+  conductorNumber: number;
+  personalYear:    number;
   targetYear:      number;
-  digitCount:      Record<number, number>;   // 1–9 → occurrences
-  loShuGrid:       LoShuCell[][];            // 3×3 grid
+  digitCount:      Record<number, number>;
+  loShuGrid:       LoShuCell[][];
   driverMeaning:    { title: string; keywords: string };
   conductorMeaning: { title: string; keywords: string };
   personalYearMeaning: { title: string; keywords: string };
+  // name number (Chaldean)
+  name:              string;
+  nameCompound:      number;   // raw total before reduction
+  nameNumber:        number;   // reduced single digit
+  nameNumberMeaning: { title: string; keywords: string };
 }
 
 // ─── main function ────────────────────────────────────────────────────────────
@@ -65,6 +88,7 @@ export function calculateNumerology(
   month: number,
   year: number,
   targetYear: number = new Date().getFullYear(),
+  name = '',
 ): NumerologyResult {
   // 1. Driver number — reduce birth day
   const driverNumber = reduceToSingle(day);
@@ -89,6 +113,9 @@ export function calculateNumerology(
     row.map(n => ({ number: n, count: digitCount[n], present: digitCount[n] > 0 })),
   );
 
+  // 6. Name number (Chaldean)
+  const { compound: nameCompound, single: nameNumber } = calculateNameNumber(name);
+
   return {
     driverNumber,
     conductorNumber,
@@ -99,5 +126,9 @@ export function calculateNumerology(
     driverMeaning:       NUMBER_MEANING[driverNumber],
     conductorMeaning:    NUMBER_MEANING[conductorNumber],
     personalYearMeaning: NUMBER_MEANING[personalYear],
+    name,
+    nameCompound,
+    nameNumber,
+    nameNumberMeaning: NUMBER_MEANING[nameNumber] ?? NUMBER_MEANING[1],
   };
 }

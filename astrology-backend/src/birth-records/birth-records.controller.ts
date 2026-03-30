@@ -40,4 +40,30 @@ export class BirthRecordsController {
     const resolvedBasis: 'lagna' | 'moon' = basis === 'moon' ? 'moon' : 'lagna';
     return this.service.getTransits(id, from, to, resolvedBasis);
   }
+
+  @Get(':id/ai-analysis')
+  getAiAnalysis(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('basis') basis?: string,
+    @Query('year') year?: string,
+  ) {
+    const resolvedBasis: 'lagna' | 'moon' = basis === 'moon' ? 'moon' : 'lagna';
+    const targetYear = year ? parseInt(year, 10) : undefined;
+    return this.service.getAiAnalysis(id, from, to, resolvedBasis, targetYear);
+  }
+
+  @Get(':id/ai-analyses')
+  listAiAnalyses(@Param('id', ParseIntPipe) id: number) {
+    return this.service.listAiAnalyses(id);
+  }
+
+  @Get(':id/ai-analyses/:analysisId')
+  getAiAnalysisById(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('analysisId', ParseIntPipe) analysisId: number,
+  ) {
+    return this.service.getAiAnalysisById(id, analysisId);
+  }
 }

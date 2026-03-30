@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { BirthRecord } from './birth-records/birth-record.entity';
+import { AiAnalysis } from './birth-records/ai-analysis.entity';
 import { BirthRecordsModule } from './birth-records/birth-records.module';
 import { City } from './cities/city.entity';
 import { CitiesModule } from './cities/cities.module';
@@ -18,7 +19,7 @@ import { CitiesModule } from './cities/cities.module';
       username: process.env.DB_USERNAME || 'root',
       password: process.env.DB_PASSWORD || '',
       database: process.env.DB_DATABASE || 'astrology',
-      entities: [BirthRecord, City],
+      entities: [BirthRecord, City, AiAnalysis],
       // Only sync the birth_records table; cities/geo tables are pre-populated via schema.sql
       synchronize: false,
       extra: {
