@@ -384,6 +384,24 @@ export class BirthRecordsService implements OnModuleInit {
     return changes.length ? changes.join('\n') : '  No sign changes in this period';
   }
 
+  private fmtPlanetRelationships(
+    relMap: Map<string, number>,
+  ): string {
+    const planets: PlanetName[] = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+    const header = '         ' + planets.map(p => p.padEnd(9)).join('');
+    const rows = planets.map(p => {
+      const cells = planets.map(q => {
+        if (p === q) return 'self     ';
+        const key = `${PLANET_DB_ID[p]}-${PLANET_DB_ID[q]}`;
+        const v = relMap.get(key);
+        const label = v === 1 ? 'friend' : v === 2 ? 'enemy' : 'neutral';
+        return label.padEnd(9);
+      });
+      return p.padEnd(9) + cells.join('');
+    });
+    return [header, ...rows].join('\n');
+  }
+
   private buildPrompt(
     record: BirthRecord,
     lagna: EnrichedChart,
@@ -393,6 +411,7 @@ export class BirthRecordsService implements OnModuleInit {
     from: string,
     to: string,
     basis: 'lagna' | 'moon',
+    relMap?: Map<string, number>,
   ): string {
     const dateStr = record.birthDate instanceof Date
       ? record.birthDate.toISOString().slice(0, 10)
@@ -474,8 +493,13 @@ ${lastDay ? this.fmtPlanets(lastDay.planets) : 'N/A'}
 Sign Changes During This Period:
 ${this.fmtSignChanges(transit.days)}
 
+=== PLANET RELATIONSHIPS (Vedic Naisargika Maitri) ===
+${relMap ? this.fmtPlanetRelationships(relMap) : '(not available)'}
+
+GEMSTONE RULE: Only recommend gemstones for planets that are FRIENDLY or OWN to the ascendant lord. NEVER put an ENEMY planet's gemstone in recommendedGemstones — enemy gemstones must go in gemstonesToAvoid. Both lists can contain multiple entries.
+
 === OUTPUT INSTRUCTIONS ===
-Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.when recommending/avoiding gemstones, recommend multiple.
+Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly. Apply the GEMSTONE RULE strictly.
 
 Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
@@ -524,12 +548,13 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
   ): Promise<AiAnalysisResult> {
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" are required');
 
-    const [lagnaChart, moonChart, transitData, numerology, record] = await Promise.all([
+    const [lagnaChart, moonChart, transitData, numerology, record, ref] = await Promise.all([
       this.getChart(id),
       this.getMoonChart(id),
       this.getTransits(id, from, to, basis),
       this.getNumerology(id, targetYear),
       this.loadRecord(id),
+      this.loadRefData(),
     ]);
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -537,7 +562,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
     const model  = 'gpt-4o';
     const openai = new OpenAI({ apiKey });
-    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, basis);
+    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, basis, ref.relMap);
 
     const completion = await openai.chat.completions.create({
       model,
@@ -562,6 +587,39 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     );
 
     return JSON.parse(content) as AiAnalysisResult;
+  }
+
+  async getPlanetRelationships(): Promise<{
+    planets: string[];
+    relationships: Record<string, Record<string, 'friendly' | 'enemy' | 'neutral'>>;
+  }> {
+    const rows = await this.dataSource.query<
+      { planet: string; related: string; is_friendly: number }[]
+    >(
+      `SELECT p1.name AS planet, p2.name AS related, pr.is_friendly
+       FROM planet_relationships pr
+       JOIN planets p1 ON p1.id = pr.planet_id
+       JOIN planets p2 ON p2.id = pr.related_planet_id
+       ORDER BY p1.id, p2.id`,
+    );
+
+    const planetSet = new Set<string>();
+    rows.forEach(r => { planetSet.add(r.planet); planetSet.add(r.related); });
+    const planets = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu']
+      .filter(p => planetSet.has(p));
+
+    const relationships: Record<string, Record<string, 'friendly' | 'enemy' | 'neutral'>> = {};
+    for (const p of planets) {
+      relationships[p] = {};
+      for (const q of planets) {
+        if (p === q) { relationships[p][q] = 'neutral'; continue; }
+        const row = rows.find(r => r.planet === p && r.related === q);
+        if (!row) { relationships[p][q] = 'neutral'; continue; }
+        relationships[p][q] = row.is_friendly === 1 ? 'friendly' : row.is_friendly === 2 ? 'enemy' : 'neutral';
+      }
+    }
+
+    return { planets, relationships };
   }
 
   async listAiAnalyses(birthRecordId: number): Promise<AiAnalysis[]> {

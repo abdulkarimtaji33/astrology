@@ -9,6 +9,7 @@ import PlanetTable from '@/components/PlanetTable';
 import HouseTable, { HouseDetail } from '@/components/HouseTable';
 import TransitPanel from '@/components/TransitPanel';
 import NumerologyPanel from '@/components/NumerologyPanel';
+import PlanetRelationshipsPanel from '@/components/PlanetRelationshipsPanel';
 
 interface PlanetPosition {
   planet: string;
@@ -43,7 +44,7 @@ export interface ChartData {
   houseDetails?: HouseDetail[];
 }
 
-type ChartTab  = 'lagna' | 'moon' | 'transit' | 'numerology';
+type ChartTab  = 'lagna' | 'moon' | 'transit' | 'numerology' | 'relationships';
 type TableView = 'houses' | 'planets';
 
 // ─── Shared chart + table layout ───────────────────────────────────────────
@@ -124,10 +125,11 @@ export default function ChartPage() {
   const isLoading = activeTab === 'lagna' ? lagnaLoading : activeTab === 'moon' ? moonLoading : false;
 
   const TAB_META: Record<ChartTab, { label: string; desc: string }> = {
-    lagna:      { label: 'Lagna',      desc: 'D1 · Lahiri Ayanamsa · Whole Sign Houses' },
-    moon:       { label: 'Moon',       desc: 'Chandra Lagna · Moon as Ascendant' },
-    transit:    { label: 'Transit',    desc: 'Planetary Transits · Relative to Natal Lagna' },
-    numerology: { label: 'Numerology', desc: 'Lo Shu Grid · Driver · Conductor · Personal Year' },
+    lagna:         { label: 'Lagna',         desc: 'D1 · Lahiri Ayanamsa · Whole Sign Houses' },
+    moon:          { label: 'Moon',          desc: 'Chandra Lagna · Moon as Ascendant' },
+    transit:       { label: 'Transit',       desc: 'Planetary Transits · Relative to Natal Lagna' },
+    numerology:    { label: 'Numerology',    desc: 'Lo Shu Grid · Driver · Conductor · Personal Year' },
+    relationships: { label: 'Relationships', desc: 'Naisargika Maitri · Natural Planetary Friendships' },
   };
 
   return (
@@ -157,7 +159,7 @@ export default function ChartPage() {
 
         {/* Tab bar */}
         <div className="mb-8 flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
-          {(['lagna', 'moon', 'transit', 'numerology'] as ChartTab[]).map(tab => (
+          {(['lagna', 'moon', 'transit', 'numerology', 'relationships'] as ChartTab[]).map(tab => (
             <button key={tab} type="button" onClick={() => setActiveTab(tab)}
               className={[
                 'px-5 py-2 rounded-lg text-sm font-medium transition',
@@ -210,6 +212,11 @@ export default function ChartPage() {
         {/* Numerology tab */}
         {activeTab === 'numerology' && (
           <NumerologyPanel chartId={id} />
+        )}
+
+        {/* Relationships tab */}
+        {activeTab === 'relationships' && (
+          <PlanetRelationshipsPanel />
         )}
 
       </main>

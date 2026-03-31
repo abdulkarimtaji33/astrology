@@ -11,6 +11,11 @@ export class BirthRecordsController {
     return this.service.create(dto);
   }
 
+  @Get('planet-relationships')
+  getPlanetRelationships() {
+    return this.service.getPlanetRelationships();
+  }
+
   @Get(':id/chart')
   getChart(@Param('id', ParseIntPipe) id: number) {
     return this.service.getChart(id);
