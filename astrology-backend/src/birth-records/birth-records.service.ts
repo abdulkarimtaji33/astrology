@@ -475,7 +475,7 @@ Sign Changes During This Period:
 ${this.fmtSignChanges(transit.days)}
 
 === OUTPUT INSTRUCTIONS ===
-Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
+Analyze ALL data above. when recommending/avoiding gemstones, recommend multiple. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
 
 Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
