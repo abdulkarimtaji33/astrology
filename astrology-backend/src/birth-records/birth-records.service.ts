@@ -496,7 +496,7 @@ ${this.fmtSignChanges(transit.days)}
 === PLANET RELATIONSHIPS (Vedic Naisargika Maitri) ===
 ${relMap ? this.fmtPlanetRelationships(relMap) : '(not available)'}
 
-GEMSTONE RULE: Only recommend gemstones for planets that are FRIENDLY or OWN to the ascendant lord. NEVER put an ENEMY planet's gemstone in recommendedGemstones — enemy gemstones must go in gemstonesToAvoid. Both lists can contain multiple entries.
+GEMSTONE RULE: Only recommend gemstones for planets that are FRIENDLY or OWN to the ascendant lord. NEVER put an ENEMY planet's gemstone in recommendedGemstones — enemy gemstones must go in gemstonesToAvoid. Both lists should contain multiple entries.
 
 === OUTPUT INSTRUCTIONS ===
 Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly. Apply the GEMSTONE RULE strictly.
