@@ -496,10 +496,14 @@ ${this.fmtSignChanges(transit.days)}
 === PLANET RELATIONSHIPS (Vedic Naisargika Maitri) ===
 ${relMap ? this.fmtPlanetRelationships(relMap) : '(not available)'}
 
-GEMSTONE RULE: Only recommend gemstones for planets that are FRIENDLY or OWN to the ascendant lord. NEVER put an ENEMY planet's gemstone in recommendedGemstones — enemy gemstones must go in gemstonesToAvoid. Both lists should contain multiple entries.
+GEMSTONE RULE:
+- recommendedGemstones MUST contain AT LEAST 3 entries (friendly/own planets that benefit this chart).
+- gemstonesToAvoid MUST contain AT LEAST 3 entries (enemy planets whose gemstones would harm this chart).
+- NEVER put an enemy planet's gemstone in recommendedGemstones.
+- Each entry must have a distinct planet and gemstone.
 
 === OUTPUT INSTRUCTIONS ===
-Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly. Apply the GEMSTONE RULE strictly.
+Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
 
 Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
@@ -512,10 +516,14 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
   "strongAreas": ["<specific area supported by the chart>", ...],
   "weakAreas": ["<specific area with chart evidence>", ...],
   "recommendedGemstones": [
-    {"name": "<gemstone>", "planet": "<planet>", "reason": "<why this planet needs strengthening in this specific chart>"}
+    {"name": "<gemstone 1>", "planet": "<planet 1>", "reason": "<why>"},
+    {"name": "<gemstone 2>", "planet": "<planet 2>", "reason": "<why>"},
+    {"name": "<gemstone 3>", "planet": "<planet 3>", "reason": "<why>"}
   ],
   "gemstonesToAvoid": [
-    {"name": "<gemstone>", "planet": "<planet>", "reason": "<why wearing this would aggravate this specific chart>"}
+    {"name": "<gemstone 1>", "planet": "<planet 1>", "reason": "<why>"},
+    {"name": "<gemstone 2>", "planet": "<planet 2>", "reason": "<why>"},
+    {"name": "<gemstone 3>", "planet": "<planet 3>", "reason": "<why>"}
   ],
   "transitPeriod": "${from} to ${to}",
   "transitOverview": "<2-3 paragraphs: factual account of major transit movements and their effects. State which houses are activated, which are stressed, and what the realistic tone of the period is — including if it is a difficult or restricted period.>",
