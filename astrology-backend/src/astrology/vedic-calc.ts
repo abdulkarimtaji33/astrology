@@ -246,6 +246,122 @@ export function calculateChart(
   };
 }
 
+// ─── Vimshottari Mahadasha ────────────────────────────────────────────────────
+
+/** Sequence and years for Vimshottari Dasha (total = 120 years) */
+const DASHA_SEQUENCE: { planet: PlanetName; years: number }[] = [
+  { planet: 'Ketu',    years: 7  },
+  { planet: 'Venus',   years: 20 },
+  { planet: 'Sun',     years: 6  },
+  { planet: 'Moon',    years: 10 },
+  { planet: 'Mars',    years: 7  },
+  { planet: 'Rahu',    years: 18 },
+  { planet: 'Jupiter', years: 16 },
+  { planet: 'Saturn',  years: 19 },
+  { planet: 'Mercury', years: 17 },
+];
+
+/**
+ * 27 Nakshatras (0-indexed) with their dasha lords.
+ * Each nakshatra spans 13°20' (= 360/27).
+ */
+const NAKSHATRA_LORDS: PlanetName[] = [
+  'Ketu','Venus','Sun','Moon','Mars','Rahu','Jupiter','Saturn','Mercury', // 0-8
+  'Ketu','Venus','Sun','Moon','Mars','Rahu','Jupiter','Saturn','Mercury', // 9-17
+  'Ketu','Venus','Sun','Moon','Mars','Rahu','Jupiter','Saturn','Mercury', // 18-26
+];
+
+const NAKSHATRA_NAMES = [
+  'Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha',
+  'Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha',
+  'Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishtha','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati',
+];
+
+export interface DashaPeriod {
+  planet: PlanetName;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;
+  years: number;
+  isCurrent: boolean;
+}
+
+export interface MahadashaResult {
+  moonNakshatra: string;
+  moonNakshatraIndex: number;
+  moonLongitude: number;
+  dashaLordAtBirth: PlanetName;
+  periods: DashaPeriod[];
+}
+
+/** Add fractional years to a Date, returns new Date */
+function addYears(date: Date, years: number): Date {
+  const ms = years * 365.25 * 24 * 60 * 60 * 1000;
+  return new Date(date.getTime() + ms);
+}
+
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function calculateMahadasha(
+  moonLongitude: number,
+  birthDate: Date,
+): MahadashaResult {
+  const NAKSHATRA_SPAN = 360 / 27; // 13.333...°
+
+  const nakshatraIndex = Math.floor(moonLongitude / NAKSHATRA_SPAN);
+  const degreeInNakshatra = moonLongitude % NAKSHATRA_SPAN;
+  const fractionRemaining = 1 - degreeInNakshatra / NAKSHATRA_SPAN;
+
+  const dashaLord = NAKSHATRA_LORDS[nakshatraIndex];
+  const dashaEntry = DASHA_SEQUENCE.find(d => d.planet === dashaLord)!;
+
+  // Years remaining in the birth dasha
+  const yearsRemaining = dashaEntry.years * fractionRemaining;
+
+  // Build full sequence starting from the birth dasha
+  const startIndex = DASHA_SEQUENCE.findIndex(d => d.planet === dashaLord);
+  const now = new Date();
+
+  const periods: DashaPeriod[] = [];
+  let cursor = new Date(birthDate);
+
+  // First period: only the remaining portion
+  const firstEnd = addYears(cursor, yearsRemaining);
+  periods.push({
+    planet:    dashaLord,
+    startDate: toDateStr(cursor),
+    endDate:   toDateStr(firstEnd),
+    years:     parseFloat(yearsRemaining.toFixed(2)),
+    isCurrent: cursor <= now && now < firstEnd,
+  });
+  cursor = firstEnd;
+
+  // Subsequent full periods — enough to cover ~120 years from birth
+  for (let i = 1; i < 9 * 3; i++) {
+    const entry = DASHA_SEQUENCE[(startIndex + i) % 9];
+    const end = addYears(cursor, entry.years);
+    periods.push({
+      planet:    entry.planet,
+      startDate: toDateStr(cursor),
+      endDate:   toDateStr(end),
+      years:     entry.years,
+      isCurrent: cursor <= now && now < end,
+    });
+    cursor = end;
+    // Stop after covering 120 years from birth
+    if (cursor.getTime() - birthDate.getTime() > 120 * 365.25 * 24 * 60 * 60 * 1000) break;
+  }
+
+  return {
+    moonNakshatra:      NAKSHATRA_NAMES[nakshatraIndex],
+    moonNakshatraIndex: nakshatraIndex,
+    moonLongitude,
+    dashaLordAtBirth:   dashaLord,
+    periods,
+  };
+}
+
 // ─── transit calculation ─────────────────────────────────────────────────────
 /**
  * Calculate sidereal planetary positions for a given UTC date (at noon).

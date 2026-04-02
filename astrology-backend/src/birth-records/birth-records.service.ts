@@ -8,6 +8,8 @@ import { AiAnalysis } from './ai-analysis.entity';
 import {
   calculateChart,
   calculateTransitPlanets,
+  calculateMahadasha,
+  MahadashaResult,
   LagnaChart,
   PlanetName,
   PlanetPosition,
@@ -348,6 +350,20 @@ export class BirthRecordsService implements OnModuleInit {
     return calculateNumerology(day, month, year, targetYear, record.name ?? '');
   }
 
+  async getMahadasha(id: number): Promise<MahadashaResult> {
+    const record = await this.loadRecord(id);
+    const [year, month, day] = this.parseBirthDate(record);
+    const [hour, minute, second] = this.parseBirthTime(record);
+    const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
+    const lon = record.longitude ? Number(record.longitude) : 78.9629;
+
+    const chart = calculateChart(year, month, day, hour, minute, second, lat, lon, record.timezone ?? '');
+    const moon  = chart.planets.find(p => p.planet === 'Moon')!;
+
+    const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T00:00:00Z`);
+    return calculateMahadasha(moon.longitude, birthDate);
+  }
+
   // ── AI analysis ──────────────────────────────────────────────────────────
 
   private fmtPlanets(planets: PlanetPosition[]): string {
@@ -402,6 +418,21 @@ export class BirthRecordsService implements OnModuleInit {
     return [header, ...rows].join('\n');
   }
 
+  private fmtMahadasha(md: MahadashaResult): string {
+    const current = md.periods.find(p => p.isCurrent);
+    const lines = [`Moon Nakshatra: ${md.moonNakshatra} (index ${md.moonNakshatraIndex})`];
+    lines.push(`Dasha Lord at Birth: ${md.dashaLordAtBirth}`);
+    if (current) {
+      lines.push(`Current Mahadasha: ${current.planet} (${current.startDate} → ${current.endDate})`);
+    }
+    lines.push('All Periods:');
+    for (const p of md.periods) {
+      const marker = p.isCurrent ? ' ← CURRENT' : '';
+      lines.push(`  ${p.planet.padEnd(9)} ${p.startDate} → ${p.endDate}${marker}`);
+    }
+    return lines.join('\n');
+  }
+
   private buildPrompt(
     record: BirthRecord,
     lagna: EnrichedChart,
@@ -412,6 +443,7 @@ export class BirthRecordsService implements OnModuleInit {
     to: string,
     basis: 'lagna' | 'moon',
     relMap?: Map<string, number>,
+    mahadasha?: MahadashaResult,
   ): string {
     const dateStr = record.birthDate instanceof Date
       ? record.birthDate.toISOString().slice(0, 10)
@@ -493,6 +525,9 @@ ${lastDay ? this.fmtPlanets(lastDay.planets) : 'N/A'}
 Sign Changes During This Period:
 ${this.fmtSignChanges(transit.days)}
 
+=== VIMSHOTTARI MAHADASHA ===
+${mahadasha ? this.fmtMahadasha(mahadasha) : '(not available)'}
+
 === PLANET RELATIONSHIPS (Vedic Naisargika Maitri) ===
 ${relMap ? this.fmtPlanetRelationships(relMap) : '(not available)'}
 
@@ -556,13 +591,14 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
   ): Promise<AiAnalysisResult> {
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" are required');
 
-    const [lagnaChart, moonChart, transitData, numerology, record, ref] = await Promise.all([
+    const [lagnaChart, moonChart, transitData, numerology, record, ref, mahadasha] = await Promise.all([
       this.getChart(id),
       this.getMoonChart(id),
       this.getTransits(id, from, to, basis),
       this.getNumerology(id, targetYear),
       this.loadRecord(id),
       this.loadRefData(),
+      this.getMahadasha(id),
     ]);
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -570,7 +606,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
     const model  = 'gpt-4o';
     const openai = new OpenAI({ apiKey });
-    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, basis, ref.relMap);
+    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, basis, ref.relMap, mahadasha);
 
     const completion = await openai.chat.completions.create({
       model,

@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { DiamondChart, ChartShape } from './LagnaChartSVG';
 import AiAnalysisModal, { AiAnalysisResult } from './AiAnalysisModal';
+import MahadashaPanel from './MahadashaPanel';
 
 interface AiAnalysisSummary {
   id: number;
@@ -462,6 +463,9 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
               </div>
             )}
           </div>
+
+          {/* Mahadasha */}
+          <MahadashaPanel chartId={chartId} />
 
           {/* Sign change summary */}
           <SignChangeSummary days={data.days} />

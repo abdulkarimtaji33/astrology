@@ -16,6 +16,11 @@ export class BirthRecordsController {
     return this.service.getPlanetRelationships();
   }
 
+  @Get(':id/mahadasha')
+  getMahadasha(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getMahadasha(id);
+  }
+
   @Get(':id/chart')
   getChart(@Param('id', ParseIntPipe) id: number) {
     return this.service.getChart(id);
