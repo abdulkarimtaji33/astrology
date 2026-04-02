@@ -36,9 +36,21 @@ interface TransitDayData {
   houses: { house: number; sign: string; signIndex: number; planets: string[] }[];
 }
 
+type PlanetRel = 'own' | 'friendly' | 'enemy' | 'neutral';
+
+interface TransitHouseInfo {
+  house: number;
+  sign: string;
+  signLord: string;
+  mainTheme: string;
+  represents: string;
+  planetRelationships: Record<string, PlanetRel>;
+}
+
 interface TransitResponse {
   natalLagna: { longitude: number; sign: string; signIndex: number; degreeInSign: number };
   natalPlanets: TransitPlanet[];
+  houseInfo: TransitHouseInfo[];
   from: string;
   to: string;
   days: TransitDayData[];
@@ -70,15 +82,25 @@ const DIGNITY_BADGE: Record<string, string> = {
   neutral:     'bg-white/10 text-white/50',
 };
 
+const REL_BADGE: Record<PlanetRel, string> = {
+  own:      'bg-amber-400/20 text-amber-300 border-amber-400/30',
+  friendly: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  enemy:    'bg-red-500/15 text-red-300 border-red-500/30',
+  neutral:  'bg-white/10 text-white/45 border-white/15',
+};
+
 // ─── Transit comparison table ──────────────────────────────────────────────
 function TransitTable({
   transitPlanets,
   natalPlanets,
+  houseInfo,
 }: {
   transitPlanets: TransitPlanet[];
   natalPlanets: TransitPlanet[];
+  houseInfo: TransitHouseInfo[];
 }) {
   const natalMap = new Map(natalPlanets.map(p => [p.planet, p]));
+  const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-md overflow-hidden">
@@ -93,10 +115,13 @@ function TransitTable({
             <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/30">
               <th className="px-4 py-2.5">Planet</th>
               <th className="px-3 py-2.5">Transit Sign</th>
+              <th className="px-3 py-2.5">Sign Lord</th>
               <th className="px-3 py-2.5">Transit House</th>
+              <th className="px-3 py-2.5 min-w-[140px]">House Theme</th>
+              <th className="px-3 py-2.5">vs Lord</th>
               <th className="px-3 py-2.5">Natal Sign</th>
               <th className="px-3 py-2.5">Natal House</th>
-              <th className="px-3 py-2.5">Status</th>
+              <th className="px-3 py-2.5">Dignity</th>
             </tr>
           </thead>
           <tbody>
@@ -107,6 +132,9 @@ function TransitTable({
               const dignityKey   = tp.dignity.includes('exalted')     ? 'exalted'
                 : tp.dignity.includes('debilitated') ? 'debilitated'
                 : tp.dignity.includes('own')         ? 'own'          : 'neutral';
+
+              const hi = houseByNum.get(tp.house);
+              const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
 
               return (
                 <tr key={tp.planet}
@@ -131,10 +159,29 @@ function TransitTable({
                     </span>
                   </td>
 
+                  {/* Sign lord (of transit sign / house cusp) */}
+                  <td className="px-3 py-3 text-xs text-cyan-300/90">
+                    {hi?.signLord ?? '—'}
+                  </td>
+
                   {/* Transit house */}
                   <td className="px-3 py-3">
                     <span className={houseChanged ? 'text-amber-300 font-semibold tabular-nums' : 'tabular-nums text-white/60'}>
                       H{tp.house}
+                    </span>
+                  </td>
+
+                  {/* House theme */}
+                  <td className="px-3 py-3 max-w-[200px]">
+                    <p className="text-xs leading-snug text-white/70 line-clamp-2" title={hi?.represents}>
+                      {hi?.mainTheme ?? '—'}
+                    </p>
+                  </td>
+
+                  {/* Planet vs sign lord (naisargika) */}
+                  <td className="px-3 py-3">
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}>
+                      {rel}
                     </span>
                   </td>
 
@@ -567,6 +614,7 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
             <TransitTable
               transitPlanets={selectedDay.planets}
               natalPlanets={data.natalPlanets}
+              houseInfo={data.houseInfo ?? []}
             />
           )}
         </>

@@ -45,9 +45,20 @@ export interface TransitDayData {
   houses: { house: number; sign: string; signIndex: number; planets: string[] }[];
 }
 
+export interface TransitHouseInfo {
+  house: number;
+  sign: string;
+  signLord: string;
+  mainTheme: string;
+  represents: string;
+  /** relationship of each transit planet to the sign lord of this house */
+  planetRelationships: Record<string, 'own' | 'friendly' | 'enemy' | 'neutral'>;
+}
+
 export interface TransitResponse {
   natalLagna: LagnaChart['lagna'];
   natalPlanets: PlanetPosition[];
+  houseInfo: TransitHouseInfo[];
   from: string;
   to: string;
   days: TransitDayData[];
@@ -335,9 +346,42 @@ export class BirthRecordsService implements OnModuleInit {
       });
     }
 
+    const ref = await this.loadRefData();
+    const allPlanets: PlanetName[] = ['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'];
+    const houseInfo: TransitHouseInfo[] = Array.from({ length: 12 }, (_, i) => {
+      const houseSignIndex = (lagnaSignIndex + i) % 12;
+      const sign = SIGNS[houseSignIndex];
+      const signData = ref.signMap.get(sign);
+      const houseMeta = ref.houseMap.get(i + 1);
+      const lordDbId = signData?.ruledBy ?? 0;
+
+      const planetRelationships: Record<string, 'own' | 'friendly' | 'enemy' | 'neutral'> = {};
+      for (const planet of allPlanets) {
+        const pDbId = PLANET_DB_ID[planet];
+        if (pDbId === lordDbId) {
+          planetRelationships[planet] = 'own';
+        } else if (pDbId && lordDbId) {
+          const v = ref.relMap.get(`${pDbId}-${lordDbId}`);
+          planetRelationships[planet] = v === 1 ? 'friendly' : v === 2 ? 'enemy' : 'neutral';
+        } else {
+          planetRelationships[planet] = 'neutral';
+        }
+      }
+
+      return {
+        house:      i + 1,
+        sign,
+        signLord:   signData?.lord ?? '',
+        mainTheme:  houseMeta?.mainTheme ?? '',
+        represents: houseMeta?.represents ?? '',
+        planetRelationships,
+      };
+    });
+
     return {
       natalLagna:   basisLagna,
       natalPlanets: natal.planets,
+      houseInfo,
       from,
       to:  days[days.length - 1]?.date ?? to,
       days,
