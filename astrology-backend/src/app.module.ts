@@ -24,7 +24,7 @@ import { CitiesModule } from './cities/cities.module';
       synchronize: false,
       extra: {
         connectionLimit: 10,
-        connectTimeout: 60000,
+        connectTimeout: 600000, // 
       },
     }),
     BirthRecordsModule,

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import OpenAI from 'openai';
@@ -94,6 +94,7 @@ export interface AiAnalysisResult {
   gemstonesToAvoid: GemstoneAdvice[];
   transitPeriod: string;
   transitOverview: string;
+  dashaAnalysis: string;
   investmentRisk: InvestmentMetric;
   jobOpportunity: TransitMetric;
   marriageLikelihood: TransitMetric;
@@ -113,6 +114,8 @@ const PLANET_DB_ID: Record<PlanetName, number> = {
 
 @Injectable()
 export class BirthRecordsService implements OnModuleInit {
+  private readonly logger = new Logger(BirthRecordsService.name);
+
   constructor(
     @InjectRepository(BirthRecord)
     private readonly repo: Repository<BirthRecord>,
@@ -122,6 +125,7 @@ export class BirthRecordsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    this.logger.log('onModuleInit: ensuring ai_analyses table');
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS ai_analyses (
         id           INT AUTO_INCREMENT PRIMARY KEY,
@@ -136,10 +140,12 @@ export class BirthRecordsService implements OnModuleInit {
         INDEX idx_ai_birth_record (birth_record_id)
       )
     `);
+    this.logger.log('onModuleInit: done');
   }
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
   async create(dto: CreateBirthRecordDto): Promise<BirthRecord> {
+    this.logger.log(`create: name=${dto.name} birthDate=${dto.birthDate}`);
     const record = this.repo.create({
       name: dto.name,
       birthDate: new Date(dto.birthDate),
@@ -149,13 +155,44 @@ export class BirthRecordsService implements OnModuleInit {
       longitude: dto.longitude,
       timezone: dto.timezone,
     });
-    return this.repo.save(record);
+    const saved = await this.repo.save(record);
+    this.logger.log(`create: saved id=${saved.id}`);
+    return saved;
+  }
+
+  async getSummary(id: number): Promise<{
+    id: number;
+    name: string;
+    birthDate: string;
+    birthTime: string;
+    cityName: string | null;
+    timezone: string | null;
+  }> {
+    this.logger.log(`getSummary: id=${id}`);
+    const r = await this.loadRecord(id);
+    const birthDate =
+      r.birthDate instanceof Date
+        ? r.birthDate.toISOString().slice(0, 10)
+        : String(r.birthDate).slice(0, 10);
+    const birthTime = String(r.birthTime).slice(0, 8);
+    return {
+      id: r.id,
+      name: r.name,
+      birthDate,
+      birthTime,
+      cityName: r.cityName ?? null,
+      timezone: r.timezone ?? null,
+    };
   }
 
   // ── private helpers ───────────────────────────────────────────────────────
   private async loadRecord(id: number): Promise<BirthRecord> {
+    this.logger.debug(`loadRecord: id=${id}`);
     const record = await this.repo.findOne({ where: { id } });
-    if (!record) throw new NotFoundException(`Birth record ${id} not found`);
+    if (!record) {
+      this.logger.warn(`loadRecord: not found id=${id}`);
+      throw new NotFoundException(`Birth record ${id} not found`);
+    }
     return record;
   }
 
@@ -174,6 +211,7 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   private async loadRefData(): Promise<RefData> {
+    this.logger.debug('loadRefData: querying houses, zodiac_signs, planet_relationships');
     const [houseRows, signRows, relRows] = await Promise.all([
       this.dataSource.query<{ id: number; main_theme: string; represents: string }[]>(
         'SELECT id, main_theme, represents FROM houses',
@@ -187,11 +225,15 @@ export class BirthRecordsService implements OnModuleInit {
       ),
     ]);
 
-    return {
+    const ref = {
       signMap: new Map(signRows.map(r => [r.name, { ruledBy: r.ruled_by, lord: r.lord_name }])),
       houseMap: new Map(houseRows.map(r => [r.id, { mainTheme: r.main_theme, represents: r.represents }])),
       relMap:   new Map(relRows.map(r => [`${r.planet_id}-${r.related_planet_id}`, r.is_friendly])),
     };
+    this.logger.debug(
+      `loadRefData: houses=${houseRows.length} signs=${signRows.length} rels=${relRows.length}`,
+    );
+    return ref;
   }
 
   private buildHouseDetails(chart: LagnaChart, ref: RefData): HouseDetail[] {
@@ -234,6 +276,7 @@ export class BirthRecordsService implements OnModuleInit {
 
   // ── public chart methods ──────────────────────────────────────────────────
   async getChart(id: number): Promise<EnrichedChart> {
+    this.logger.log(`getChart: start id=${id}`);
     const record = await this.loadRecord(id);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
@@ -244,10 +287,12 @@ export class BirthRecordsService implements OnModuleInit {
     const ref     = await this.loadRefData();
     const houseDetails = this.buildHouseDetails(chart, ref);
 
+    this.logger.log(`getChart: done id=${id} lagna=${chart.lagna.sign}`);
     return { ...chart, houseDetails };
   }
 
   async getMoonChart(id: number): Promise<EnrichedChart> {
+    this.logger.log(`getMoonChart: start id=${id}`);
     const record = await this.loadRecord(id);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
@@ -292,10 +337,13 @@ export class BirthRecordsService implements OnModuleInit {
     const ref          = await this.loadRefData();
     const houseDetails = this.buildHouseDetails(moonChart, ref);
 
+    this.logger.log(`getMoonChart: done id=${id} moonLagna=${moonChart.lagna.sign}`);
     return { ...moonChart, houseDetails };
   }
 
-  async getTransits(id: number, from: string, to: string, basis: 'lagna' | 'moon' = 'lagna'): Promise<TransitResponse> {
+  /** Transit houses are always whole-sign from the natal Moon sign (Chandra Lagna). */
+  async getTransits(id: number, from: string, to: string): Promise<TransitResponse> {
+    this.logger.log(`getTransits: start id=${id} from=${from} to=${to}`);
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" (YYYY-MM-DD) are required');
 
     const record = await this.loadRecord(id);
@@ -306,12 +354,14 @@ export class BirthRecordsService implements OnModuleInit {
 
     const natal = calculateChart(year, month, day, hour, minute, second, lat, lon, record.timezone ?? '');
 
-    // Determine reference sign index based on basis
     const moon           = natal.planets.find(p => p.planet === 'Moon')!;
-    const lagnaSignIndex = basis === 'moon' ? moon.signIndex : natal.lagna.signIndex;
-    const basisLagna     = basis === 'moon'
-      ? { longitude: moon.longitude, sign: moon.sign, signIndex: moon.signIndex, degreeInSign: moon.degreeInSign }
-      : natal.lagna;
+    const lagnaSignIndex = moon.signIndex;
+    const basisLagna     = {
+      longitude: moon.longitude,
+      sign: moon.sign,
+      signIndex: moon.signIndex,
+      degreeInSign: moon.degreeInSign,
+    };
 
     const fromMs  = new Date(from + 'T00:00:00Z').getTime();
     const toMs    = new Date(to   + 'T00:00:00Z').getTime();
@@ -319,6 +369,7 @@ export class BirthRecordsService implements OnModuleInit {
     if (fromMs > toMs) throw new BadRequestException('"from" must be ≤ "to"');
 
     const diffDays = Math.ceil((toMs - fromMs) / 86400000) + 1;
+    this.logger.log(`getTransits: computing ${diffDays} days chandraLagna=${basisLagna.sign}`);
 
     const days: TransitDayData[] = [];
     for (let i = 0; i < diffDays; i++) {
@@ -378,6 +429,7 @@ export class BirthRecordsService implements OnModuleInit {
       };
     });
 
+    this.logger.log(`getTransits: done id=${id} days=${days.length}`);
     return {
       natalLagna:   basisLagna,
       natalPlanets: natal.planets,
@@ -389,12 +441,16 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   async getNumerology(id: number, targetYear?: number): Promise<NumerologyResult> {
+    this.logger.log(`getNumerology: id=${id} targetYear=${targetYear ?? 'default'}`);
     const record = await this.loadRecord(id);
     const [year, month, day] = this.parseBirthDate(record);
-    return calculateNumerology(day, month, year, targetYear, record.name ?? '');
+    const n = calculateNumerology(day, month, year, targetYear, record.name ?? '');
+    this.logger.debug(`getNumerology: done driver=${n.driverNumber}`);
+    return n;
   }
 
   async getMahadasha(id: number): Promise<MahadashaResult> {
+    this.logger.log(`getMahadasha: id=${id}`);
     const record = await this.loadRecord(id);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
@@ -405,7 +461,9 @@ export class BirthRecordsService implements OnModuleInit {
     const moon  = chart.planets.find(p => p.planet === 'Moon')!;
 
     const birthDate = new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T00:00:00Z`);
-    return calculateMahadasha(moon.longitude, birthDate);
+    const md = calculateMahadasha(moon.longitude, birthDate);
+    this.logger.log(`getMahadasha: done periods=${md.periods.length}`);
+    return md;
   }
 
   // ── AI analysis ──────────────────────────────────────────────────────────
@@ -468,8 +526,14 @@ export class BirthRecordsService implements OnModuleInit {
     lines.push(`Dasha Lord at Birth: ${md.dashaLordAtBirth}`);
     if (current) {
       lines.push(`Current Mahadasha: ${current.planet} (${current.startDate} → ${current.endDate})`);
+      // Find upcoming period
+      const idx = md.periods.indexOf(current);
+      if (idx + 1 < md.periods.length) {
+        const next = md.periods[idx + 1];
+        lines.push(`Next Mahadasha: ${next.planet} (${next.startDate} → ${next.endDate})`);
+      }
     }
-    lines.push('All Periods:');
+    lines.push('\nAll Periods:');
     for (const p of md.periods) {
       const marker = p.isCurrent ? ' ← CURRENT' : '';
       lines.push(`  ${p.planet.padEnd(9)} ${p.startDate} → ${p.endDate}${marker}`);
@@ -485,10 +549,10 @@ export class BirthRecordsService implements OnModuleInit {
     numerology: NumerologyResult,
     from: string,
     to: string,
-    basis: 'lagna' | 'moon',
     relMap?: Map<string, number>,
     mahadasha?: MahadashaResult,
   ): string {
+    this.logger.debug(`buildPrompt: ${record.name} ${from}–${to}`);
     const dateStr = record.birthDate instanceof Date
       ? record.birthDate.toISOString().slice(0, 10)
       : String(record.birthDate).slice(0, 10);
@@ -519,8 +583,10 @@ TONE RULES — follow these strictly:
 - Do NOT use motivational, encouraging, or consoling language. Do not say things like "you have great potential", "opportunities await", "with effort you can overcome", or any similar phrases.
 - Do NOT soften difficult placements. If a planet is debilitated, retrograde, combust, or in an enemy sign — state it plainly and describe the realistic effect.
 - Do NOT inflate the positive. If a placement is genuinely strong, say so. If it is mixed or weak, say so.
-- Percentages must reflect the actual chart and transit quality. A difficult transit for investment should score low (10–30%). Do not default to moderate numbers to avoid seeming negative.
-- Mention specific planets, houses, signs, and dignities as evidence for every claim.
+- Percentages MUST vary widely based on the actual chart. Range the full 0–100 spectrum.
+- The investmentRisk percentage is NOT a fixed value. It must reflect a real analysis.
+- Dasha analysis is CRITICAL — the Mahadasha lord's natal strength, sign, house, and relationships to wealth/career houses must directly influence all percentage scores and the dashaAnalysis field.
+- Don't care about the "friend, enemy, neutral" that is given to you. it is just a relationship between two planets for gemstone recommendations.
 
 BIRTH DETAILS:
 Name: ${record.name}
@@ -539,7 +605,7 @@ ${this.fmtPlanets(lagna.planets)}
 House Analysis:
 ${this.fmtHouses(lagna.houseDetails)}
 
-=== MOON CHART (Chandra Lagna) ===
+=== MOON CHART (Chandra Lagna) (moon chart is only for making transits, for life predictions, use lagna chart) ===
 Moon Sign (Ascendant): ${moon.lagna.sign} ${moon.lagna.degreeInSign.toFixed(2)}°
 
 Planetary Positions (from Moon):
@@ -558,7 +624,7 @@ Planes of Expression:
 ${planes}
 
 === TRANSIT ANALYSIS: ${from} to ${to} ===
-House Count Basis: ${basis === 'moon' ? 'Moon Sign' : 'Natal Lagna'} (${transit.natalLagna.sign})
+House Count Basis: Moon Sign — Chandra Lagna (${transit.natalLagna.sign})
 
 Transit Positions at Start (${from}):
 ${firstDay ? this.fmtPlanets(firstDay.planets) : 'N/A'}
@@ -576,19 +642,29 @@ ${mahadasha ? this.fmtMahadasha(mahadasha) : '(not available)'}
 ${relMap ? this.fmtPlanetRelationships(relMap) : '(not available)'}
 
 GEMSTONE RULE:
-- recommendedGemstones MUST contain AT LEAST 3 entries (friendly/own planets that benefit this chart).
-- gemstonesToAvoid MUST contain AT LEAST 3 entries (enemy planets whose gemstones would harm this chart).
-- NEVER put an enemy planet's gemstone in recommendedGemstones.
+- Gemstone recommendations are based on the LAGNA LORD's perspective (the lord of H1 in the Lagna chart).
+- recommendedGemstones: planets that are friendly or own TO THE LAGNA LORD (per the relationship table above). These are safe to strengthen.
+- gemstonesToAvoid: planets that are ENEMY to the Lagna lord. Wearing their gemstone harms the chart.
+- Example: if Lagna is Scorpio, the Lagna lord is Mars. Look at Mars's row in the relationship table. Planets Mars considers friend → recommended. Planets Mars considers enemy → avoid.
+- recommendedGemstones MUST contain AT LEAST 3 entries.
+- gemstonesToAvoid MUST contain AT LEAST 3 entries.
 - Each entry must have a distinct planet and gemstone.
+- Gemstones should be recommended by birth chart, not mahadasha or transit.
+- If a gemstone resolves the weakness of a planet, it should be prioritized over others. But it should be friendly to the Lagna lord.
 
 === OUTPUT INSTRUCTIONS ===
-Analyze ALL data above. Cite specific planets, houses, and dignities for every statement. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
+Analyze ALL data above. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
+
+For every percentage:
+- First determine the natal chart baseline (is the relevant house/lord strong, weak, or mixed?)
+- Then overlay the transit (are benefics or malefics transiting the relevant houses?)
+- Only after this multi-layer synthesis should you assign the number. NEVER default to any fixed percentage.
 
 Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
 {
   "lifeGeneral": "<2-3 paragraphs: life path, core karma, key patterns. Name the specific ascendant lord, its placement, and what that concretely means. Address both strengths and problems in the chart without weighting either side.>",
-  "personality": "<1-2 paragraphs: temperament and behavior patterns from Lagna and Moon sign. Include negative traits where the chart shows them — e.g. impulsiveness, rigidity, emotional difficulty, etc.>",
+  "personality": "<2-3 paragraphs: temperament and behavior patterns from Lagna and Moon sign. Include negative traits where the chart shows them — e.g. impulsiveness, rigidity, emotional difficulty, etc.>",
   "wealth": "<1-2 paragraphs: financial picture from 2nd and 11th houses, their lords, and any relevant yogas or afflictions. State clearly if the chart shows financial struggle, instability, or restriction, and why.>",
   "familyLife": "<1-2 paragraphs: family relationships from 4th house. Include any karmic difficulties — estrangement, loss, tension — if shown by the chart.>",
   "marriageLife": "<1-2 paragraphs: marriage prospects from 7th house lord, Venus, and relevant transits. State delays, complications, or incompatibility indicators if present.>",
@@ -606,22 +682,23 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
   ],
   "transitPeriod": "${from} to ${to}",
   "transitOverview": "<2-3 paragraphs: factual account of major transit movements and their effects. State which houses are activated, which are stressed, and what the realistic tone of the period is — including if it is a difficult or restricted period.>",
+  "dashaAnalysis": "<2-3 paragraphs: analyze the current Mahadasha lord — its natal sign, house, dignity, and planetary relationships. Explain what themes dominate under this dasha (career, family, health, wealth, spirituality), any antardashas if determinable, and how this dasha interacts with the transit period. If the dasha lord is debilitated, combust, or in an enemy sign, state the concrete effects plainly.>",
   "investmentRisk": {
     "level": "<very risky | risky | neutral | good | excellent>",
-    "percentage": <integer 0–100 reflecting actual transit quality for investments — score low if 2nd/11th lords are afflicted or Saturn/Rahu are active there>,
-    "explanation": "<state which planets and houses drive this assessment>"
+    "percentage": <integer 0–100 — synthesize natal 2nd/11th strength + Mahadasha lord quality + transit of Jupiter/Saturn over wealth houses. A strong dasha lord ruling 11th in own sign with benefic transits = 70–85%. A malefic dasha lord debilitated + Saturn transiting 2nd = 10–25%. NEVER output 30 without explicit justification.>,
+    "explanation": "<name the Mahadasha lord and its natal placement, then name which transit planets affect 2nd/11th houses, and how together they justify this score>"
   },
   "jobOpportunity": {
-    "percentage": <integer 0–100>,
-    "explanation": "<10th house transits, Jupiter/Saturn/Sun positions and what they indicate>"
+    "percentage": <integer 0–100 — synthesize natal 10th house strength + whether Mahadasha lord rules or aspects 10th + transit of Jupiter/Saturn/Sun over 10th/6th. Strong dasha lord with Jupiter transiting 10th = 65–80%. Malefic dasha lord with Saturn on 10th = 15–35%.>,
+    "explanation": "<Mahadasha lord relationship to 10th house, plus transit planets over 10th/6th and their effect>"
   },
   "marriageLikelihood": {
-    "percentage": <integer 0–100>,
-    "explanation": "<7th house transits, Venus and Jupiter positions>"
+    "percentage": <integer 0–100 — synthesize natal 7th house strength + Venus placement + whether Mahadasha lord rules/aspects 7th + transit of Jupiter/Venus over 7th. Active Venus dasha with Jupiter transiting 7th = 70–85%. Saturn/Rahu dasha with malefic on 7th = 10–30%.>,
+    "explanation": "<7th house lord natally, Venus position, Mahadasha lord relation to 7th, current transit over 7th>"
   },
   "goodHealthLikelihood": {
-    "percentage": <integer 0–100>,
-    "explanation": "<1st, 6th, 8th house transits, Sun/Moon/Mars positions>"
+    "percentage": <integer 0–100 — synthesize natal 1st/6th/8th house state + Sun/Moon strength + whether Mahadasha lord is a natural malefic or benefic + transit malefics over 1st/6th/8th. Sun exalted + benefic dasha = 70–80%. Afflicted Moon + Rahu dasha + malefic transit on ascendant = 20–35%.>,
+    "explanation": "<natal lagna lord, Sun and Moon strength, Mahadasha lord nature, transit planets affecting 1st/6th/8th>"
   }
 }`;
   }
@@ -630,57 +707,92 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     id: number,
     from: string,
     to: string,
-    basis: 'lagna' | 'moon' = 'lagna',
     targetYear?: number,
   ): Promise<AiAnalysisResult> {
+    this.logger.log(`getAiAnalysis: start id=${id} from=${from} to=${to} year=${targetYear ?? '—'}`);
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" are required');
 
+    this.logger.log('getAiAnalysis: parallel load chart, moon, transits, numerology, record, ref, mahadasha');
     const [lagnaChart, moonChart, transitData, numerology, record, ref, mahadasha] = await Promise.all([
       this.getChart(id),
       this.getMoonChart(id),
-      this.getTransits(id, from, to, basis),
+      this.getTransits(id, from, to),
       this.getNumerology(id, targetYear),
       this.loadRecord(id),
       this.loadRefData(),
       this.getMahadasha(id),
     ]);
+    this.logger.log(
+      `getAiAnalysis: data loaded transitDays=${transitData.days.length} promptInputs=ok`,
+    );
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new BadRequestException('OPENAI_API_KEY is not configured');
+    if (!apiKey) {
+      this.logger.error('getAiAnalysis: OPENAI_API_KEY missing');
+      throw new BadRequestException('OPENAI_API_KEY is not configured');
+    }
 
-    const model  = 'gpt-4o';
+    const model  = 'gpt-5-mini';
     const openai = new OpenAI({ apiKey });
-    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, basis, ref.relMap, mahadasha);
+    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, ref.relMap, mahadasha);
+    this.logger.log(`getAiAnalysis: prompt built chars=${prompt.length}`);
 
-    const completion = await openai.chat.completions.create({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
-      max_tokens: 4096,
-    });
+    let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>;
+    try {
+      this.logger.log(`getAiAnalysis: OpenAI request model=${model}`);
+      const t0 = Date.now();
+      completion = await openai.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        // temperature: 0.7,
+        max_completion_tokens: 16000,
+      });
+      this.logger.log(`getAiAnalysis: OpenAI ok ${Date.now() - t0}ms usage=${JSON.stringify(completion.usage ?? {})}`);
+    } catch (err: unknown) {
+      const e = err as { message?: string; status?: number; error?: unknown };
+      this.logger.error(
+        `getAiAnalysis: OpenAI API error status=${e?.status} msg=${e?.message ?? err}`,
+        JSON.stringify(e?.error ?? {}),
+      );
+      throw err;
+    }
 
     const content = completion.choices[0]?.message?.content ?? '{}';
+    this.logger.log(`getAiAnalysis: response content chars=${content.length}`);
 
     await this.aiRepo.save(
       this.aiRepo.create({
         birthRecordId: id,
         transitFrom:   from,
         transitTo:     to,
-        basis,
+        basis:         'moon',
         model,
         prompt,
         response: content,
       }),
     );
+    this.logger.log('getAiAnalysis: saved to ai_analyses');
 
-    return JSON.parse(content) as AiAnalysisResult;
+    try {
+      const parsed = JSON.parse(content) as AiAnalysisResult;
+      this.logger.log('getAiAnalysis: JSON parse OK, returning');
+      return parsed;
+    } catch (parseErr: unknown) {
+      const pe = parseErr as Error;
+      this.logger.error(
+        `getAiAnalysis: JSON.parse failed ${pe?.message} head=${content.slice(0, 400)}`,
+        pe?.stack,
+      );
+      throw new BadRequestException('AI returned invalid JSON: ' + pe?.message);
+    }
   }
 
   async getPlanetRelationships(): Promise<{
     planets: string[];
     relationships: Record<string, Record<string, 'friendly' | 'enemy' | 'neutral'>>;
   }> {
+    this.logger.log('getPlanetRelationships: querying DB');
     const rows = await this.dataSource.query<
       { planet: string; related: string; is_friendly: number }[]
     >(
@@ -707,10 +819,12 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
       }
     }
 
+    this.logger.log(`getPlanetRelationships: done rows=${rows.length} planets=${planets.length}`);
     return { planets, relationships };
   }
 
   async listAiAnalyses(birthRecordId: number): Promise<AiAnalysis[]> {
+    this.logger.log(`listAiAnalyses: birthRecordId=${birthRecordId}`);
     return this.aiRepo.find({
       where: { birthRecordId },
       order: { createdAt: 'DESC' },
@@ -719,8 +833,12 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
   }
 
   async getAiAnalysisById(birthRecordId: number, analysisId: number): Promise<AiAnalysisResult> {
+    this.logger.log(`getAiAnalysisById: birthRecordId=${birthRecordId} analysisId=${analysisId}`);
     const row = await this.aiRepo.findOne({ where: { id: analysisId, birthRecordId } });
-    if (!row) throw new NotFoundException(`Analysis ${analysisId} not found`);
+    if (!row) {
+      this.logger.warn(`getAiAnalysisById: not found analysisId=${analysisId}`);
+      throw new NotFoundException(`Analysis ${analysisId} not found`);
+    }
     return JSON.parse(row.response) as AiAnalysisResult;
   }
 }

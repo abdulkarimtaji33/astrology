@@ -1,14 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: "/api-proxy/:path*",
-        destination: "http://127.0.0.1:6000/:path*",
-      },
-    ];
-  },
-};
+/** Long AI calls use app/api-proxy/[...path]/route.ts (no 60s rewrite limit). */
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

@@ -275,8 +275,7 @@ interface Props {
 }
 
 export default function TransitPanel({ chartId, natalLagna }: Props) {
-  const [queryParams, setQueryParams] = useState<{ from: string; to: string; basis: 'lagna' | 'moon' } | null>(null);
-  const [basis, setBasis]             = useState<'lagna' | 'moon'>('lagna');
+  const [queryParams, setQueryParams] = useState<{ from: string; to: string } | null>(null);
   const [dayIndex, setDayIndex]       = useState(0);
   const [view, setView]               = useState<'chart' | 'table'>('chart');
 
@@ -302,8 +301,8 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
     setAiLoading(true);
     try {
       const res = await api.get<AiAnalysisResult>(
-        `/birth-records/${chartId}/ai-analysis?from=${queryParams.from}&to=${queryParams.to}&basis=${queryParams.basis}`,
-        { timeout: 120000 },
+        `/birth-records/${chartId}/ai-analysis?from=${queryParams.from}&to=${queryParams.to}`,
+        { timeout: 10 * 60 * 1000 },
       );
       setAiData(res.data);
       queryClient.invalidateQueries({ queryKey: ['ai-analyses', chartId] });
@@ -344,18 +343,18 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
   });
 
   const { data, isLoading, isError } = useQuery<TransitResponse>({
-    queryKey: ['transits', chartId, queryParams?.from, queryParams?.to, queryParams?.basis],
+    queryKey: ['transits', chartId, queryParams?.from, queryParams?.to],
     queryFn: () =>
       api
         .get<TransitResponse>(
-          `/birth-records/${chartId}/transits?from=${queryParams!.from}&to=${queryParams!.to}&basis=${queryParams!.basis}`,
+          `/birth-records/${chartId}/transits?from=${queryParams!.from}&to=${queryParams!.to}`,
         )
         .then(r => r.data),
     enabled: !!queryParams,
   });
 
   const onSubmit = (values: FormValues) => {
-    setQueryParams({ from: values.from, to: values.to, basis });
+    setQueryParams({ from: values.from, to: values.to });
     setDayIndex(0);
   };
 
@@ -412,22 +411,6 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
                          [color-scheme:dark]"
             />
             {errors.to && <p className="text-xs text-red-400">{errors.to.message}</p>}
-          </div>
-
-          {/* Basis toggle */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-white/50">Count Houses From</label>
-            <div className="flex gap-1 rounded-lg border border-white/15 bg-white/5 p-1">
-              {(['lagna', 'moon'] as const).map(b => (
-                <button key={b} type="button" onClick={() => setBasis(b)}
-                  className={[
-                    'px-4 py-1.5 rounded-md text-xs font-medium transition',
-                    basis === b ? 'bg-amber-400 text-slate-900' : 'text-white/55 hover:text-white/90',
-                  ].join(' ')}>
-                  {b === 'lagna' ? 'Lagna' : 'Moon Sign'}
-                </button>
-              ))}
-            </div>
           </div>
 
           <button
@@ -568,7 +551,7 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
                   <DiamondChart chart={transitChartShape} />
                 </div>
                 <p className="text-center text-xs text-white/30">
-                  Houses from {queryParams?.basis === 'moon' ? 'Moon sign' : 'Lagna'}{' '}
+                  Houses from Moon sign (Chandra Lagna){' '}
                   <span className="text-white/50">({data.natalLagna.sign})</span>
                 </p>
               </div>

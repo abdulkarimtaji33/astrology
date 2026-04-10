@@ -31,6 +31,11 @@ export class BirthRecordsController {
     return this.service.getMoonChart(id);
   }
 
+  @Get(':id/summary')
+  getSummary(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getSummary(id);
+  }
+
   @Get(':id/numerology')
   getNumerology(
     @Param('id', ParseIntPipe) id: number,
@@ -45,10 +50,8 @@ export class BirthRecordsController {
     @Param('id', ParseIntPipe) id: number,
     @Query('from') from: string,
     @Query('to') to: string,
-    @Query('basis') basis?: string,
   ) {
-    const resolvedBasis: 'lagna' | 'moon' = basis === 'moon' ? 'moon' : 'lagna';
-    return this.service.getTransits(id, from, to, resolvedBasis);
+    return this.service.getTransits(id, from, to);
   }
 
   @Get(':id/ai-analysis')
@@ -56,12 +59,10 @@ export class BirthRecordsController {
     @Param('id', ParseIntPipe) id: number,
     @Query('from') from: string,
     @Query('to') to: string,
-    @Query('basis') basis?: string,
     @Query('year') year?: string,
   ) {
-    const resolvedBasis: 'lagna' | 'moon' = basis === 'moon' ? 'moon' : 'lagna';
     const targetYear = year ? parseInt(year, 10) : undefined;
-    return this.service.getAiAnalysis(id, from, to, resolvedBasis, targetYear);
+    return this.service.getAiAnalysis(id, from, to, targetYear);
   }
 
   @Get(':id/ai-analyses')

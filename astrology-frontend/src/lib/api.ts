@@ -8,6 +8,8 @@ const baseURL =
 const api = axios.create({
   baseURL,
   headers: { "Content-Type": "application/json" },
+  /** Browser → Next proxy → Nest; AI routes need up to 10 minutes */
+  timeout: 10 * 60 * 1000,
 });
 
 export default api;

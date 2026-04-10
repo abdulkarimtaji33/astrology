@@ -30,6 +30,7 @@ export interface AiAnalysisResult {
   gemstonesToAvoid: GemstoneAdvice[];
   transitPeriod: string;
   transitOverview: string;
+  dashaAnalysis?: string;
   investmentRisk: InvestmentMetric;
   jobOpportunity: TransitMetric;
   marriageLikelihood: TransitMetric;
@@ -289,6 +290,14 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
               <SectionTitle>Transit Overview</SectionTitle>
               <Prose text={data.transitOverview} />
             </div>
+
+            {/* ── Dasha Analysis ── */}
+            {data.dashaAnalysis && (
+              <div className="rounded-2xl border border-violet-400/20 bg-violet-400/5 p-5">
+                <SectionTitle>Vimshottari Dasha Analysis</SectionTitle>
+                <Prose text={data.dashaAnalysis} />
+              </div>
+            )}
 
             {/* ── Metric Cards ── */}
             <div className="grid gap-4 sm:grid-cols-2">
