@@ -18,6 +18,12 @@ export default function Home() {
           <p className="mt-2 text-white/70">
             Enter your birth details to continue
           </p>
+          <a
+            href="/world-events"
+            className="mt-4 inline-block text-sm text-violet-300/90 underline decoration-violet-400/40 underline-offset-4 hover:text-violet-200"
+          >
+            World events (AI)
+          </a>
         </div>
         <BirthDataForm />
       </main>

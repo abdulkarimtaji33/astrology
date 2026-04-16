@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { BirthRecordsService } from './birth-records.service';
 import { CreateBirthRecordDto } from './dto/create-birth-record.dto';
 
@@ -76,5 +76,19 @@ export class BirthRecordsController {
     @Param('analysisId', ParseIntPipe) analysisId: number,
   ) {
     return this.service.getAiAnalysisById(id, analysisId);
+  }
+
+  @Get(':id/house-ai')
+  getHouseAi(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('house') house: string,
+    @Query('chart') chart?: string,
+  ) {
+    const h = parseInt(house, 10);
+    if (Number.isNaN(h) || h < 1 || h > 12) {
+      throw new BadRequestException('Query "house" must be an integer 1–12');
+    }
+    const kind = chart === 'moon' ? 'moon' : 'lagna';
+    return this.service.getHouseAiAnalysis(id, h, kind);
   }
 }

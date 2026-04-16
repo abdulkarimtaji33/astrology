@@ -101,6 +101,11 @@ export interface AiAnalysisResult {
   goodHealthLikelihood: TransitMetric;
 }
 
+export interface HouseAiResult {
+  interpretation: string;
+  keyThemes: string[];
+}
+
 // ─── reference data shape ─────────────────────────────────────────────────────
 type RefData = {
   signMap: Map<string, { ruledBy: number; lord: string }>;
@@ -746,7 +751,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         // temperature: 0.7,
-        max_completion_tokens: 16000,
+        max_completion_tokens: 3000,
       });
       this.logger.log(`getAiAnalysis: OpenAI ok ${Date.now() - t0}ms usage=${JSON.stringify(completion.usage ?? {})}`);
     } catch (err: unknown) {
@@ -784,6 +789,89 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
         `getAiAnalysis: JSON.parse failed ${pe?.message} head=${content.slice(0, 400)}`,
         pe?.stack,
       );
+      throw new BadRequestException('AI returned invalid JSON: ' + pe?.message);
+    }
+  }
+
+  async getHouseAiAnalysis(
+    id: number,
+    house: number,
+    chartKind: 'lagna' | 'moon',
+  ): Promise<HouseAiResult> {
+    if (house < 1 || house > 12) throw new BadRequestException('house must be 1–12');
+    this.logger.log(`getHouseAiAnalysis: id=${id} house=${house} chart=${chartKind}`);
+
+    const [chart, record] = await Promise.all([
+      chartKind === 'moon' ? this.getMoonChart(id) : this.getChart(id),
+      this.loadRecord(id),
+    ]);
+    const detail = chart.houseDetails.find(hd => hd.house === house);
+    if (!detail) throw new NotFoundException(`House ${house} not found`);
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      this.logger.error('getHouseAiAnalysis: OPENAI_API_KEY missing');
+      throw new BadRequestException('OPENAI_API_KEY is not configured');
+    }
+
+    const ascLabel =
+      chartKind === 'moon'
+        ? `Chandra Lagna (Moon as ascendant): ${chart.lagna.sign} ${chart.lagna.degreeInSign.toFixed(2)}°`
+        : `Lagna: ${chart.lagna.sign} ${chart.lagna.degreeInSign.toFixed(2)}°`;
+    const chartNote =
+      chartKind === 'moon'
+        ? 'Chandra Lagna chart — houses counted from the Moon sign.'
+        : 'Standard Lagna chart — houses counted from the rising sign.';
+
+    const houseBlock = this.fmtHouses([detail]);
+    const planetsContext = this.fmtPlanets(chart.planets);
+
+    const prompt = `You are a Vedic (Jyotish) astrologer. Interpret a single house for this native using whole-sign houses and Lahiri ayanamsa.
+
+Native name: ${record.name}
+Chart: ${chartNote}
+${ascLabel}
+Ayanamsa: ${chart.ayanamsa.toFixed(4)}°
+
+Planetary positions (context):
+${planetsContext}
+
+House to interpret:
+${houseBlock}
+
+=== INSTRUCTIONS ===
+Explain what this house configuration means in practice: sign on the cusp, house lord (signLord), planets in the house, their dignity badges, retrogression, and relationship to the house lord (own/friend/enemy/neutral). Tie insights to classic house meanings. Be specific to the data — avoid generic text. Mention challenges where the chart shows them.
+
+Return ONLY valid JSON (no markdown):
+{
+  "interpretation": "<2-4 paragraphs, plain text>",
+  "keyThemes": ["<3-8 short bullet themes>"]
+}`;
+
+    const model = 'gpt-5-mini';
+    const openai = new OpenAI({ apiKey });
+    let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>;
+    try {
+      const t0 = Date.now();
+      completion = await openai.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        max_completion_tokens: 6000,
+      });
+      this.logger.log(`getHouseAiAnalysis: OpenAI ok ${Date.now() - t0}ms`);
+    } catch (err: unknown) {
+      const e = err as { message?: string; status?: number };
+      this.logger.error(`getHouseAiAnalysis: OpenAI error ${e?.status} ${e?.message ?? err}`);
+      throw err;
+    }
+
+    const content = completion.choices[0]?.message?.content ?? '{}';
+    try {
+      return JSON.parse(content) as HouseAiResult;
+    } catch (parseErr: unknown) {
+      const pe = parseErr as Error;
+      this.logger.error(`getHouseAiAnalysis: JSON.parse failed ${pe?.message}`);
       throw new BadRequestException('AI returned invalid JSON: ' + pe?.message);
     }
   }

@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import api from '@/lib/api';
+
 export interface HousePlanetDetail {
   planet: string;
   degreeInSign: number;
@@ -27,17 +30,61 @@ const REL_STYLE: Record<string, string> = {
 
 
 const PLANET_SYM: Record<string, string> = {
-  Sun:'☉', Moon:'☽', Mercury:'☿', Venus:'♀',
-  Mars:'♂', Jupiter:'♃', Saturn:'♄', Rahu:'☊', Ketu:'☋',
+  Sun: '\u2609',
+  Moon: '\u263D',
+  Mercury: '\u263F',
+  Venus: '\u2640',
+  Mars: '\u2642',
+  Jupiter: '\u2643',
+  Saturn: '\u2644',
+  Rahu: '\u260A',
+  Ketu: '\u260B',
 };
 
 const REL_LABEL: Record<string, string> = {
   own: 'Own', friendly: 'Friend', enemy: 'Enemy', neutral: 'Neutral',
 };
 
+interface HouseAiResult {
+  interpretation: string;
+  keyThemes: string[];
+}
+
 // ─── component ────────────────────────────────────────────────────────────
-export default function HouseTable({ houses }: { houses: HouseDetail[] }) {
+export default function HouseTable({
+  houses,
+  chartId,
+  chartKind,
+}: {
+  houses: HouseDetail[];
+  chartId: string;
+  chartKind: 'lagna' | 'moon';
+}) {
   const sorted = [...houses].sort((a, b) => a.house - b.house);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [result, setResult] = useState<HouseAiResult | null>(null);
+
+  const analyzeHouse = async (houseNum: number) => {
+    setModalTitle(`House ${houseNum} · ${chartKind === 'moon' ? 'Chandra Lagna' : 'Lagna'}`);
+    setResult(null);
+    setError(false);
+    setModalOpen(true);
+    setLoading(true);
+    try {
+      const res = await api.get<HouseAiResult>(
+        `/birth-records/${chartId}/house-ai?house=${houseNum}&chart=${chartKind}`,
+        { timeout: 10 * 60 * 1000 },
+      );
+      setResult(res.data);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-md overflow-hidden">
@@ -55,6 +102,7 @@ export default function HouseTable({ houses }: { houses: HouseDetail[] }) {
               <th className="px-3 py-2.5">Theme</th>
               <th className="px-3 py-2.5">Planets</th>
               <th className="px-3 py-2.5">Dignity</th>
+              <th className="px-3 py-2.5 w-0">AI</th>
             </tr>
           </thead>
           <tbody>
@@ -92,7 +140,7 @@ export default function HouseTable({ houses }: { houses: HouseDetail[] }) {
                           {/* symbol + name */}
                           <span>{PLANET_SYM[p.planet] ?? ''}</span>
                           <span>{p.planet}</span>
-                          {p.isRetrograde && <span className="opacity-70">ᴿ</span>}
+                          {p.isRetrograde && <span className="opacity-70">{'\u1D3F'}</span>}
                           {/* degree */}
                           <span className="opacity-55 tabular-nums">
                             {Math.floor(p.degreeInSign)}°
@@ -135,11 +183,72 @@ export default function HouseTable({ houses }: { houses: HouseDetail[] }) {
                     )}
                   </div>
                 </td>
+                <td className="px-3 py-3 align-middle">
+                  <button
+                    type="button"
+                    onClick={() => analyzeHouse(h.house)}
+                    disabled={loading}
+                    className="whitespace-nowrap rounded-lg border border-violet-400/35 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold text-violet-200/90 transition hover:bg-violet-500/20 disabled:opacity-40"
+                    aria-busy={loading}
+                  >
+                    Analyze with AI
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="house-ai-title"
+        >
+          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-slate-900/95 shadow-2xl flex flex-col">
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+              <h3 id="house-ai-title" className="text-sm font-semibold text-white">
+                {modalTitle}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="rounded-lg px-2 py-1 text-white/50 hover:bg-white/10 hover:text-white"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 text-sm text-white/80">
+              {loading && (
+                <div className="flex justify-center py-12">
+                  <div className="h-9 w-9 animate-spin rounded-full border-4 border-violet-400 border-t-transparent" />
+                </div>
+              )}
+              {error && !loading && (
+                <p className="text-red-300">Could not load analysis. Try again.</p>
+              )}
+              {result && !loading && (
+                <div className="space-y-4">
+                  <p className="whitespace-pre-wrap leading-relaxed">{result.interpretation}</p>
+                  {result.keyThemes?.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-white/40">Themes</p>
+                      <ul className="list-disc space-y-1 pl-5 text-white/70">
+                        {result.keyThemes.map(t => (
+                          <li key={t}>{t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

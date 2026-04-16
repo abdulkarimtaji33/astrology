@@ -53,10 +53,14 @@ function ChartSection({
   chart,
   lagnaLabel,
   lagnaSubLabel,
+  chartId,
+  chartKind,
 }: {
   chart: ChartData;
   lagnaLabel: string;
   lagnaSubLabel: string;
+  chartId: string;
+  chartKind: 'lagna' | 'moon';
 }) {
   const [view, setView] = useState<TableView>('houses');
 
@@ -100,7 +104,7 @@ function ChartSection({
           ))}
         </div>
         {view === 'houses' && chart.houseDetails
-          ? <HouseTable houses={chart.houseDetails} />
+          ? <HouseTable houses={chart.houseDetails} chartId={chartId} chartKind={chartKind} />
           : <PlanetTable planets={chart.planets} />}
       </div>
     </div>
@@ -275,20 +279,24 @@ export default function ChartPage() {
         )}
 
         {/* Lagna tab */}
-        {activeTab === 'lagna' && lagnaChart && !lagnaLoading && (
+        {activeTab === 'lagna' && lagnaChart && !lagnaLoading && id && (
           <ChartSection
             chart={lagnaChart}
             lagnaLabel="Lagna"
             lagnaSubLabel={`Ayanamsa ${lagnaChart.ayanamsa.toFixed(4)}°`}
+            chartId={id}
+            chartKind="lagna"
           />
         )}
 
         {/* Moon tab */}
-        {activeTab === 'moon' && moonChart && !moonLoading && (
+        {activeTab === 'moon' && moonChart && !moonLoading && id && (
           <ChartSection
             chart={moonChart}
             lagnaLabel="Chandra Lagna"
             lagnaSubLabel={`Ayanamsa ${moonChart.ayanamsa.toFixed(4)}°`}
+            chartId={id}
+            chartKind="moon"
           />
         )}
 

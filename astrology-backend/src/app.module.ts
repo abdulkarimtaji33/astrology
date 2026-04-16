@@ -8,6 +8,7 @@ import { AiAnalysis } from './birth-records/ai-analysis.entity';
 import { BirthRecordsModule } from './birth-records/birth-records.module';
 import { City } from './cities/city.entity';
 import { CitiesModule } from './cities/cities.module';
+import { WorldEventsModule } from './world-events/world-events.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CitiesModule } from './cities/cities.module';
     }),
     BirthRecordsModule,
     CitiesModule,
+    WorldEventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
