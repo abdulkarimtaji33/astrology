@@ -9,7 +9,9 @@ import {
   calculateChart,
   calculateTransitPlanets,
   calculateMahadasha,
+  calculateSaturnTransits,
   MahadashaResult,
+  SaturnTransitResult,
   LagnaChart,
   PlanetName,
   PlanetPosition,
@@ -469,6 +471,21 @@ export class BirthRecordsService implements OnModuleInit {
     const md = calculateMahadasha(moon.longitude, birthDate);
     this.logger.log(`getMahadasha: done periods=${md.periods.length}`);
     return md;
+  }
+
+  async getSaturnTransits(id: number): Promise<SaturnTransitResult> {
+    this.logger.log(`getSaturnTransits: id=${id}`);
+    const record = await this.loadRecord(id);
+    const [year, month, day] = this.parseBirthDate(record);
+    const [hour, minute, second] = this.parseBirthTime(record);
+    const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
+    const lon = record.longitude ? Number(record.longitude) : 78.9629;
+
+    const chart = calculateChart(year, month, day, hour, minute, second, lat, lon, record.timezone ?? '');
+    const moon  = chart.planets.find(p => p.planet === 'Moon')!;
+    const result = calculateSaturnTransits(moon.signIndex);
+    this.logger.log(`getSaturnTransits: done periods=${result.periods.length}`);
+    return result;
   }
 
   // ── AI analysis ──────────────────────────────────────────────────────────

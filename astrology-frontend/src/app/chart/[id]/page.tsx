@@ -10,6 +10,7 @@ import HouseTable, { HouseDetail } from '@/components/HouseTable';
 import TransitPanel from '@/components/TransitPanel';
 import NumerologyPanel from '@/components/NumerologyPanel';
 import PlanetRelationshipsPanel from '@/components/PlanetRelationshipsPanel';
+import SaturnPanel from '@/components/SaturnPanel';
 import AiAnalysisModal, { AiAnalysisResult } from '@/components/AiAnalysisModal';
 
 interface PlanetPosition {
@@ -45,7 +46,7 @@ export interface ChartData {
   houseDetails?: HouseDetail[];
 }
 
-type ChartTab  = 'lagna' | 'moon' | 'transit' | 'numerology' | 'relationships';
+type ChartTab  = 'lagna' | 'moon' | 'transit' | 'numerology' | 'relationships' | 'saturn';
 type TableView = 'houses' | 'planets';
 
 // ─── Shared chart + table layout ───────────────────────────────────────────
@@ -184,6 +185,7 @@ export default function ChartPage() {
     transit:       { label: 'Transit',       desc: 'Planetary Transits · Chandra Lagna (from Moon sign)' },
     numerology:    { label: 'Numerology',    desc: 'Lo Shu Grid · Driver · Conductor · Personal Year' },
     relationships: { label: 'Relationships', desc: 'Naisargika Maitri · Natural Planetary Friendships' },
+    saturn:        { label: 'Saturn',        desc: 'Sade Sati · Dhaiyya (Kantaka Shani)' },
   };
 
   return (
@@ -251,7 +253,7 @@ export default function ChartPage() {
 
         {/* Tab bar */}
         <div className="mb-8 flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
-          {(['lagna', 'moon', 'transit', 'numerology', 'relationships'] as ChartTab[]).map(tab => (
+          {(['lagna', 'moon', 'transit', 'numerology', 'relationships', 'saturn'] as ChartTab[]).map(tab => (
             <button key={tab} type="button" onClick={() => setActiveTab(tab)}
               className={[
                 'px-5 py-2 rounded-lg text-sm font-medium transition',
@@ -313,6 +315,11 @@ export default function ChartPage() {
         {/* Relationships tab */}
         {activeTab === 'relationships' && (
           <PlanetRelationshipsPanel />
+        )}
+
+        {/* Saturn tab */}
+        {activeTab === 'saturn' && id && (
+          <SaturnPanel chartId={id} />
         )}
 
       </main>

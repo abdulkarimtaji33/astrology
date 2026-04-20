@@ -362,6 +362,157 @@ export function calculateMahadasha(
   };
 }
 
+// ─── Saturn Sade Sati / Dhaiyya ──────────────────────────────────────────────
+
+export type SaturnPeriodType = 'sade-sati' | 'dhaiyya';
+export type SadeSatiPhase = 'rising' | 'peak' | 'setting';
+
+export interface SaturnPeriod {
+  type: SaturnPeriodType;
+  /** For sade-sati: which of the 3 phases */
+  phase?: SadeSatiPhase;
+  /** Saturn sign during this sub-period */
+  saturnSign: SignName;
+  /** House from natal Moon (1-based) */
+  houseFromMoon: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  isPast: boolean;
+}
+
+export interface SaturnTransitResult {
+  natalMoonSign: SignName;
+  natalMoonSignIndex: number;
+  periods: SaturnPeriod[];
+  currentPeriod: SaturnPeriod | null;
+  isInSadeSati: boolean;
+  isInDhaiyya: boolean;
+}
+
+/** Approximate date when Saturn enters a given sign index (sidereal), searching from startJd. */
+function saturnSignIngress(targetSignIndex: number, searchFromJd: number): number {
+  swe.swe_set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+  const flags = swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED;
+  let jd = searchFromJd;
+  // coarse: step by month until we're in target sign or just past it
+  while (true) {
+    const r = swe.swe_calc_ut(jd, swe.SE_SATURN, flags);
+    const sign = Math.floor(r.longitude / 30);
+    if (sign === targetSignIndex) break;
+    jd += 30;
+    if (jd > searchFromJd + 365 * 35) break; // safety
+  }
+  // now binary-search to day precision
+  let lo = jd - 30, hi = jd;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const r = swe.swe_calc_ut(mid, swe.SE_SATURN, flags);
+    if (Math.floor(r.longitude / 30) === targetSignIndex) hi = mid; else lo = mid;
+  }
+  return hi;
+}
+
+/** Approximate date when Saturn leaves a given sign index (sidereal), searching from startJd. */
+function saturnSignEgress(signIndex: number, searchFromJd: number): number {
+  swe.swe_set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+  const flags = swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED;
+  let jd = searchFromJd;
+  while (true) {
+    const r = swe.swe_calc_ut(jd, swe.SE_SATURN, flags);
+    const sign = Math.floor(r.longitude / 30);
+    if (sign !== signIndex) break;
+    jd += 30;
+    if (jd > searchFromJd + 365 * 5) break;
+  }
+  let lo = jd - 30, hi = jd;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const r = swe.swe_calc_ut(mid, swe.SE_SATURN, flags);
+    if (Math.floor(r.longitude / 30) === signIndex) lo = mid; else hi = mid;
+  }
+  return hi;
+}
+
+function jdToDateStr(jd: number): string {
+  // Julian day to calendar: use a simple calculation
+  const msFromJ2000 = (jd - 2451545.0) * 86400000;
+  const d = new Date(Date.UTC(2000, 0, 1, 12, 0, 0) + msFromJ2000);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Calculate Saturn Sade Sati and Dhaiyya periods around today.
+ * Covers ~60 years: 30 years back and 30 years forward.
+ * Sade Sati = Saturn in 12th, 1st (Moon sign), 2nd from Moon
+ * Dhaiyya   = Saturn in 4th or 8th from Moon
+ */
+export function calculateSaturnTransits(moonSignIndex: number): SaturnTransitResult {
+  const now = new Date();
+  const nowJd = swe.swe_julday(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate(), 12.0, 1);
+  const startJd = nowJd - 365.25 * 30;
+
+  // Houses from Moon that trigger Sade Sati / Dhaiyya
+  // Sade Sati: signs at -1 (12th), 0 (1st), +1 (2nd) relative to Moon sign
+  // Dhaiyya:   signs at +3 (4th) and +7 (8th) from Moon sign
+  const relevantOffsets: { offset: number; type: SaturnPeriodType; phase?: SadeSatiPhase }[] = [
+    { offset: -1, type: 'sade-sati', phase: 'rising'  },
+    { offset:  0, type: 'sade-sati', phase: 'peak'    },
+    { offset:  1, type: 'sade-sati', phase: 'setting' },
+    { offset:  3, type: 'dhaiyya'  },
+    { offset:  7, type: 'dhaiyya'  },
+  ];
+
+  const periods: SaturnPeriod[] = [];
+
+  for (const { offset, type, phase } of relevantOffsets) {
+    const targetSign = ((moonSignIndex + offset) + 12) % 12;
+
+    // Find all occurrences of Saturn in targetSign within our window
+    // Saturn takes ~29.5 years per cycle, so we may see 1-2 occurrences
+    let searchJd = startJd;
+    const endSearchJd = nowJd + 365.25 * 30;
+
+    while (searchJd < endSearchJd) {
+      const ingressJd = saturnSignIngress(targetSign, searchJd);
+      if (ingressJd > endSearchJd) break;
+      const egressJd = saturnSignEgress(targetSign, ingressJd);
+
+      const startStr = jdToDateStr(ingressJd);
+      const endStr = jdToDateStr(egressJd);
+      const startDate = new Date(startStr);
+      const endDate = new Date(endStr);
+
+      periods.push({
+        type,
+        phase,
+        saturnSign: SIGNS[targetSign],
+        houseFromMoon: ((targetSign - moonSignIndex + 12) % 12) + 1,
+        startDate: startStr,
+        endDate: endStr,
+        isActive: startDate <= now && now < endDate,
+        isPast: endDate < now,
+      });
+
+      searchJd = egressJd + 1; // move past this occurrence
+    }
+  }
+
+  // Sort by start date
+  periods.sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  const currentPeriod = periods.find(p => p.isActive) ?? null;
+
+  return {
+    natalMoonSign: SIGNS[moonSignIndex],
+    natalMoonSignIndex: moonSignIndex,
+    periods,
+    currentPeriod,
+    isInSadeSati: periods.some(p => p.isActive && p.type === 'sade-sati'),
+    isInDhaiyya: periods.some(p => p.isActive && p.type === 'dhaiyya'),
+  };
+}
+
 // ─── transit calculation ─────────────────────────────────────────────────────
 /**
  * Calculate sidereal planetary positions for a given UTC date (at noon).

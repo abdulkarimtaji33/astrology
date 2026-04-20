@@ -21,6 +21,11 @@ export class BirthRecordsController {
     return this.service.getMahadasha(id);
   }
 
+  @Get(':id/saturn-transits')
+  getSaturnTransits(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getSaturnTransits(id);
+  }
+
   @Get(':id/chart')
   getChart(@Param('id', ParseIntPipe) id: number) {
     return this.service.getChart(id);
