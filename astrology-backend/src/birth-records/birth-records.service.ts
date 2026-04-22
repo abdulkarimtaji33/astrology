@@ -274,22 +274,71 @@ export class BirthRecordsService implements OnModuleInit {
     return this.avasthaRepo.find({ order: { id: 'ASC' } });
   }
 
-  /** Match planet’s degree within sign (0–30°) to reference rows. */
-  private matchPlanetaryAvastha(degreeInSign: number, rows: PlanetaryAvastha[]): PlanetaryAvastha | null {
-    const d = degreeInSign;
-    for (const row of rows) {
-      if (row.degreeFrom == null || row.degreeTo == null) continue;
-      const from = Number(row.degreeFrom);
-      const to = Number(row.degreeTo);
+  /** 9 equal in-sign segments (0–30°) when `planetary_avastha` has no data. */
+  private buildDefaultPlanetaryAvastha(): PlanetaryAvastha[] {
+    const n = 9;
+    const out: PlanetaryAvastha[] = [];
+    for (let i = 0; i < n; i++) {
+      const from = (30 * i) / n;
+      const to = (30 * (i + 1)) / n;
+      const labelTo = i === n - 1 ? '30.00' : to.toFixed(2);
+      out.push({
+        id: -(i + 1),
+        name: null,
+        englishName: `In-sign ${i + 1}/9 (${from.toFixed(2)}°–${labelTo}°)`,
+        degreeFrom: (Math.round(from * 100) / 100).toFixed(1),
+        degreeTo: (Math.round(to * 100) / 100).toFixed(1),
+        effectPercent: Math.max(10, 100 - i * 11),
+      });
+    }
+    return out;
+  }
+
+  private static norm360(longitude: number): number {
+    return ((longitude % 360) + 360) % 360;
+  }
+
+  private static normDegreeInRashi(deg: number): number {
+    const x = deg % 30;
+    return x < 0 ? x + 30 : x;
+  }
+
+  private static parseDeg(v: string | null | undefined): number {
+    if (v == null || v === '') return Number.NaN;
+    const n = Number(String(v).replace(',', '.'));
+    return n;
+  }
+
+  /**
+   * Inclusive [from, to] on the same scale as `d`. First matching row after sorting by `from` wins
+   * (if ranges touch, the earlier band is used — same as a filled reference table with no gaps).
+   */
+  private matchPlanetaryAvastha(d: number, rows: PlanetaryAvastha[]): PlanetaryAvastha | null {
+    const sorted = rows
+      .filter(r => r.degreeFrom != null && r.degreeTo != null)
+      .sort((a, b) => BirthRecordsService.parseDeg(a.degreeFrom) - BirthRecordsService.parseDeg(b.degreeFrom));
+    for (const row of sorted) {
+      const from = BirthRecordsService.parseDeg(row.degreeFrom);
+      const to = BirthRecordsService.parseDeg(row.degreeTo);
       if (Number.isNaN(from) || Number.isNaN(to)) continue;
-      if (d >= from - 1e-6 && d <= to + 1e-6) return row;
+      if (d + 1e-7 >= from && d - 1e-7 <= to) return row;
     }
     return null;
   }
 
   private attachAvasthaToPlanets(planets: PlanetPosition[], rows: PlanetaryAvastha[]): PlanetWithAvastha[] {
+    const effective = rows.length > 0 ? rows : this.buildDefaultPlanetaryAvastha();
+    if (rows.length === 0) {
+      this.logger.log('attachAvasthaToPlanets: planetary_avastha is empty, using 9 in-sign default bands');
+    }
     return planets.map(p => {
-      const hit = this.matchPlanetaryAvastha(p.degreeInSign, rows);
+      // 1) In-sign 0–30 (normal case). 2) Full sidereal 0–360 (if table stores absolute longitude).
+      const dRashi = BirthRecordsService.normDegreeInRashi(p.degreeInSign);
+      let hit = this.matchPlanetaryAvastha(dRashi, effective);
+      if (!hit) {
+        const dLon = BirthRecordsService.norm360(p.longitude);
+        hit = this.matchPlanetaryAvastha(dLon, effective);
+      }
       const avastha: PlanetAvasthaInfo | null = hit
         ? {
             name: hit.name,
