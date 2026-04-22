@@ -16,10 +16,111 @@ export class PaginationQueryDto {
   limit? = 20;
 }
 
+export class BirthRecordsListQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cityQ?: string;
+
+  @IsOptional()
+  @IsString()
+  timezoneQ?: string;
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  createdFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  createdTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idMax?: number;
+}
+
 export class CityListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  stateId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  countryId?: number;
+
+  @IsOptional()
+  @IsString()
+  timezoneQ?: string;
+
+  @IsOptional()
+  @IsString()
+  typeQ?: string;
+
+  @IsOptional()
+  @IsString()
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  stateCode?: string;
+}
+
+export class CountryListQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  regionId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  subregionId?: number;
+
+  @IsOptional()
+  @IsString()
+  iso2?: string;
+}
+
+export class StateListQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  countryId?: number;
+
+  @IsOptional()
+  @IsString()
+  countryCode?: string;
 }
 
 export class AiAnalysesListQueryDto extends PaginationQueryDto {
@@ -27,6 +128,44 @@ export class AiAnalysesListQueryDto extends PaginationQueryDto {
   @Type(() => Number)
   @IsInt()
   birthRecordId?: number;
+
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @IsOptional()
+  @IsString()
+  basis?: string;
+
+  @IsOptional()
+  @IsString()
+  transitFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  transitTo?: string;
+
+  @IsOptional()
+  @IsString()
+  createdFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  createdTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idMax?: number;
 }
 
 export function getSkipTake(page: number, limit: number) {

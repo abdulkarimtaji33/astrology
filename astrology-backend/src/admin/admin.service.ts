@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { BirthRecord } from '../birth-records/birth-record.entity';
 import { AiAnalysis } from '../birth-records/ai-analysis.entity';
 import { City } from '../cities/city.entity';
@@ -16,7 +16,16 @@ import { GeoRegion } from '../entities/region.entity';
 import { Subregion } from '../entities/subregion.entity';
 import { Country } from '../entities/country.entity';
 import { State } from '../entities/state.entity';
-import { AiAnalysesListQueryDto, CityListQueryDto, getSkipTake, ListResult, PaginationQueryDto, toListResult } from './admin-pagination';
+import {
+  AiAnalysesListQueryDto,
+  BirthRecordsListQueryDto,
+  CityListQueryDto,
+  CountryListQueryDto,
+  getSkipTake,
+  ListResult,
+  StateListQueryDto,
+  toListResult,
+} from './admin-pagination';
 import {
   AdminAiAnalysisPatchDto,
   AdminAiAnalysisWriteDto,
@@ -92,13 +101,32 @@ export class AdminService {
   }
 
   /* --- birth records --- */
-  async listBirth(dto: PaginationQueryDto): Promise<ListResult<BirthRecord>> {
+  async listBirth(dto: BirthRecordsListQueryDto): Promise<ListResult<BirthRecord>> {
     const { skip, take, page, limit } = getSkipTake(dto.page ?? 1, dto.limit ?? 20);
-    const [items, total] = await this.birth.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip,
-      take,
-    });
+    const qb = this.birth.createQueryBuilder('br');
+    const q = (dto.q ?? '').trim();
+    if (q) {
+      const like = `%${q}%`;
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('br.name LIKE :like', { like })
+            .orWhere('br.cityName LIKE :like', { like })
+            .orWhere('CAST(br.id AS CHAR) LIKE :like', { like });
+        }),
+      );
+    }
+    const cq = (dto.cityQ ?? '').trim();
+    if (cq) qb.andWhere('br.cityName LIKE :cq', { cq: `%${cq}%` });
+    const tz = (dto.timezoneQ ?? '').trim();
+    if (tz) qb.andWhere('br.timezone LIKE :tz', { tz: `%${tz}%` });
+    if (dto.dateFrom) qb.andWhere('br.birthDate >= :df', { df: dto.dateFrom });
+    if (dto.dateTo) qb.andWhere('br.birthDate <= :dt', { dt: dto.dateTo });
+    if (dto.createdFrom) qb.andWhere('br.createdAt >= :cf', { cf: `${dto.createdFrom} 00:00:00` });
+    if (dto.createdTo) qb.andWhere('br.createdAt <= :ct', { ct: `${dto.createdTo} 23:59:59.999` });
+    if (dto.idMin != null) qb.andWhere('br.id >= :idmin', { idmin: dto.idMin });
+    if (dto.idMax != null) qb.andWhere('br.id <= :idmax', { idmax: dto.idMax });
+    qb.orderBy('br.createdAt', 'DESC').skip(skip).take(take);
+    const [items, total] = await qb.getManyAndCount();
     return toListResult(items, total, page, limit);
   }
 
@@ -140,12 +168,37 @@ export class AdminService {
   }
 
   /* --- ai analyses --- */
-  listAi(dto: AiAnalysesListQueryDto): Promise<ListResult<AiAnalysis>> {
+  async listAi(dto: AiAnalysesListQueryDto): Promise<ListResult<AiAnalysis>> {
     const { skip, take, page, limit } = getSkipTake(dto.page ?? 1, dto.limit ?? 20);
-    const wh = dto.birthRecordId != null ? { birthRecordId: dto.birthRecordId } : {};
-    return this.ai
-      .findAndCount({ where: wh, order: { id: 'DESC' }, skip, take })
-      .then(([items, total]) => toListResult(items, total, page, limit));
+    const qb = this.ai
+      .createQueryBuilder('ai')
+      .leftJoin(BirthRecord, 'br', 'br.id = ai.birthRecordId');
+    if (dto.birthRecordId != null) qb.andWhere('ai.birthRecordId = :brid', { brid: dto.birthRecordId });
+    const mq = (dto.q ?? '').trim();
+    if (mq) {
+      const like = `%${mq}%`;
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('ai.prompt LIKE :like', { like })
+            .orWhere('ai.response LIKE :like', { like })
+            .orWhere('ai.model LIKE :like', { like })
+            .orWhere('ai.basis LIKE :like', { like })
+            .orWhere('br.name LIKE :like', { like })
+            .orWhere('CAST(ai.birthRecordId AS CHAR) LIKE :tid', { tid: `%${mq}%` });
+        }),
+      );
+    }
+    if (dto.model?.trim()) qb.andWhere('ai.model LIKE :model', { model: `%${dto.model.trim()}%` });
+    if (dto.basis?.trim()) qb.andWhere('ai.basis = :basis', { basis: dto.basis.trim() });
+    if (dto.transitFrom?.trim()) qb.andWhere('ai.transitFrom >= :tf', { tf: dto.transitFrom.trim() });
+    if (dto.transitTo?.trim()) qb.andWhere('ai.transitTo <= :tt', { tt: dto.transitTo.trim() });
+    if (dto.createdFrom) qb.andWhere('ai.createdAt >= :cdf', { cdf: `${dto.createdFrom} 00:00:00` });
+    if (dto.createdTo) qb.andWhere('ai.createdAt <= :cdt', { cdt: `${dto.createdTo} 23:59:59.999` });
+    if (dto.idMin != null) qb.andWhere('ai.id >= :idmin', { idmin: dto.idMin });
+    if (dto.idMax != null) qb.andWhere('ai.id <= :idmax', { idmax: dto.idMax });
+    qb.orderBy('ai.id', 'DESC').skip(skip).take(take);
+    const [items, total] = await qb.getManyAndCount();
+    return toListResult(items, total, page, limit);
   }
 
   getAi(id: number) {
@@ -442,11 +495,26 @@ export class AdminService {
     if (!(await this.subregion.delete({ id })).affected) throw new NotFoundException();
   }
 
-  listCountries(dto: PaginationQueryDto) {
+  async listCountries(dto: CountryListQueryDto) {
     const { skip, take, page, limit } = getSkipTake(dto.page ?? 1, dto.limit ?? 20);
-    return this.country
-      .findAndCount({ order: { name: 'ASC' }, skip, take })
-      .then(([items, total]) => toListResult(items, total, page, limit));
+    const qb = this.country.createQueryBuilder('c');
+    const qq = (dto.q ?? '').trim();
+    if (qq) {
+      const like = `%${qq}%`;
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('c.name LIKE :like', { like })
+            .orWhere('c.iso2 LIKE :like', { like })
+            .orWhere('c.iso3 LIKE :like', { like });
+        }),
+      );
+    }
+    if (dto.regionId != null) qb.andWhere('c.regionId = :rid', { rid: dto.regionId });
+    if (dto.subregionId != null) qb.andWhere('c.subregionId = :sid', { sid: dto.subregionId });
+    if (dto.iso2?.trim()) qb.andWhere('c.iso2 = :i2', { i2: dto.iso2.trim().toUpperCase() });
+    qb.orderBy('c.name', 'ASC').skip(skip).take(take);
+    const [items, total] = await qb.getManyAndCount();
+    return toListResult(items, total, page, limit);
   }
   getCountry(id: number) {
     return this.country.findOneBy({ id }).then((r) => {
@@ -487,11 +555,25 @@ export class AdminService {
     if (!(await this.country.delete({ id })).affected) throw new NotFoundException();
   }
 
-  listStates(dto: PaginationQueryDto) {
+  async listStates(dto: StateListQueryDto) {
     const { skip, take, page, limit } = getSkipTake(dto.page ?? 1, dto.limit ?? 20);
-    return this.state
-      .findAndCount({ order: { name: 'ASC' }, skip, take })
-      .then(([items, total]) => toListResult(items, total, page, limit));
+    const qb = this.state.createQueryBuilder('s');
+    const qq = (dto.q ?? '').trim();
+    if (qq) {
+      const like = `%${qq}%`;
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('s.name LIKE :like', { like })
+            .orWhere('s.countryCode LIKE :like', { like })
+            .orWhere('s.iso2 LIKE :like', { like });
+        }),
+      );
+    }
+    if (dto.countryId != null) qb.andWhere('s.countryId = :cid', { cid: dto.countryId });
+    if (dto.countryCode?.trim()) qb.andWhere('s.countryCode = :cc', { cc: dto.countryCode.trim().toUpperCase() });
+    qb.orderBy('s.name', 'ASC').skip(skip).take(take);
+    const [items, total] = await qb.getManyAndCount();
+    return toListResult(items, total, page, limit);
   }
   getStateRow(id: number) {
     return this.state.findOneBy({ id }).then((r) => {
@@ -529,13 +611,33 @@ export class AdminService {
     if (!(await this.state.delete({ id })).affected) throw new NotFoundException();
   }
 
-  listCities(dto: CityListQueryDto): Promise<ListResult<City>> {
+  async listCities(dto: CityListQueryDto): Promise<ListResult<City>> {
     const { skip, take, page, limit } = getSkipTake(dto.page ?? 1, dto.limit ?? 50);
+    const qb = this.city.createQueryBuilder('city');
     const q = (dto.q ?? '').trim();
-    const where = q.length >= 2 ? { name: Like(`%${q}%`) } : undefined;
-    return this.city
-      .findAndCount({ where, order: { id: 'DESC' }, skip, take })
-      .then(([items, total]) => toListResult(items, total, page, limit));
+    if (q.length >= 1) {
+      const like = `%${q}%`;
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('city.name LIKE :like', { like })
+            .orWhere('city.countryCode LIKE :like', { like })
+            .orWhere('city.stateCode LIKE :like', { like })
+            .orWhere('city.native LIKE :like', { like })
+            .orWhere('CAST(city.id AS CHAR) LIKE :like', { like });
+        }),
+      );
+    }
+    if (dto.stateId != null) qb.andWhere('city.stateId = :stid', { stid: dto.stateId });
+    if (dto.countryId != null) qb.andWhere('city.countryId = :cnid', { cnid: dto.countryId });
+    if (dto.countryCode?.trim()) qb.andWhere('city.countryCode = :ccd', { ccd: dto.countryCode.trim().toUpperCase() });
+    if (dto.stateCode?.trim()) qb.andWhere('city.stateCode LIKE :scd', { scd: `%${dto.stateCode.trim()}%` });
+    const tz = (dto.timezoneQ ?? '').trim();
+    if (tz) qb.andWhere('city.timezone LIKE :tz', { tz: `%${tz}%` });
+    const typ = (dto.typeQ ?? '').trim();
+    if (typ) qb.andWhere('city.type LIKE :typ', { typ: `%${typ}%` });
+    qb.orderBy('city.id', 'DESC').skip(skip).take(take);
+    const [items, total] = await qb.getManyAndCount();
+    return toListResult(items, total, page, limit);
   }
 
   getCity(id: number) {

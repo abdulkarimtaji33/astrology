@@ -2,6 +2,14 @@
 
 import { useEffect } from "react";
 
+function IcoX() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <path d="M3 3l8 8M11 3L3 11" />
+    </svg>
+  );
+}
+
 export function Modal({
   open,
   title,
@@ -23,34 +31,38 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
+      {/* Backdrop */}
       <button
         type="button"
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close"
       />
+
+      {/* Panel */}
       <div
-        className={`relative z-10 max-h-[min(90vh,900px)] w-full overflow-y-auto rounded-2xl border border-amber-500/20 bg-[#0f1419] shadow-2xl shadow-amber-900/20 ${
-          wide ? "max-w-3xl" : "max-w-lg"
+        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-zinc-900 shadow-2xl shadow-black/60 ${
+          wide ? "max-w-2xl" : "max-w-lg"
         }`}
       >
-        <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-[#0f1419]/95 px-5 py-3 backdrop-blur">
-          <h2 className="text-sm font-semibold tracking-tight text-amber-100">{title}</h2>
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.07] px-5 py-4">
+          <h2 className="text-sm font-semibold text-white">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200"
+            aria-label="Close"
           >
-            ✕
+            <IcoX />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+
+        {/* Body */}
+        <div className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );

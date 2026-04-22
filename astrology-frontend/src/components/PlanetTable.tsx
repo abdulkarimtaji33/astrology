@@ -1,5 +1,13 @@
 'use client';
 
+interface PlanetAvastha {
+  name: string | null;
+  englishName: string | null;
+  effectPercent: number | null;
+  degreeFrom: string | null;
+  degreeTo: string | null;
+}
+
 interface PlanetPosition {
   planet: string;
   longitude: number;
@@ -9,6 +17,7 @@ interface PlanetPosition {
   house: number;
   isRetrograde: boolean;
   dignity: string[];
+  avastha?: PlanetAvastha | null;
 }
 
 const DIGNITY_BADGE: Record<string, string> = {
@@ -39,6 +48,8 @@ export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) 
               <th className="px-3 py-2">Sign</th>
               <th className="px-3 py-2">Degree</th>
               <th className="px-3 py-2">House</th>
+              <th className="px-3 py-2">Avasthā</th>
+              <th className="px-3 py-2">Strength</th>
               <th className="px-3 py-2">Dignity</th>
             </tr>
           </thead>
@@ -62,6 +73,31 @@ export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) 
                   {p.degreeInSign.toFixed(2)}°
                 </td>
                 <td className="px-3 py-2.5 tabular-nums text-white/60">{p.house}</td>
+                <td className="px-3 py-2.5 max-w-[160px]">
+                  {p.avastha?.englishName ? (
+                    <span className="text-xs text-cyan-200/90" title={p.avastha.name ?? p.avastha.englishName}>
+                      {p.avastha.englishName}
+                    </span>
+                  ) : (
+                    <span className="text-white/25">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {p.avastha?.effectPercent != null ? (
+                    <span
+                      className="text-xs text-violet-200/90"
+                      title={
+                        p.avastha.degreeFrom != null && p.avastha.degreeTo != null
+                          ? `Degree in sign ${p.degreeInSign.toFixed(2)}° within ${p.avastha.degreeFrom}°–${p.avastha.degreeTo}°`
+                          : undefined
+                      }
+                    >
+                      {p.avastha.effectPercent}%
+                    </span>
+                  ) : (
+                    <span className="text-white/25">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {(Array.isArray(p.dignity) ? p.dignity : [p.dignity]).map(d => (

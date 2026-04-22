@@ -32,7 +32,13 @@ import {
   AdminUpdateBirthRecordDto,
   AdminZodiacWriteDto,
 } from './admin.dtos';
-import { AiAnalysesListQueryDto, CityListQueryDto, PaginationQueryDto } from './admin-pagination';
+import {
+  AiAnalysesListQueryDto,
+  BirthRecordsListQueryDto,
+  CityListQueryDto,
+  CountryListQueryDto,
+  StateListQueryDto,
+} from './admin-pagination';
 
 @Controller('admin')
 @UseGuards(AdminKeyGuard)
@@ -51,7 +57,7 @@ export class AdminController {
 
   /* birth records */
   @Get('birth-records')
-  listBirth(@Query() q: PaginationQueryDto) {
+  listBirth(@Query() q: BirthRecordsListQueryDto) {
     return this.admin.listBirth(q);
   }
 
@@ -311,7 +317,7 @@ export class AdminController {
   }
 
   @Get('countries')
-  listCountries(@Query() q: PaginationQueryDto) {
+  listCountries(@Query() q: CountryListQueryDto) {
     return this.admin.listCountries(q);
   }
 
@@ -336,7 +342,7 @@ export class AdminController {
   }
 
   @Get('states')
-  listStates(@Query() q: PaginationQueryDto) {
+  listStates(@Query() q: StateListQueryDto) {
     return this.admin.listStates(q);
   }
 

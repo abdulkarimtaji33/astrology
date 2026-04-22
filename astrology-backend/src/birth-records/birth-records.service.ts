@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import { CreateBirthRecordDto } from './dto/create-birth-record.dto';
 import { BirthRecord } from './birth-record.entity';
 import { AiAnalysis } from './ai-analysis.entity';
+import { PlanetaryAvastha } from '../entities/planetary-avastha.entity';
 import {
   calculateChart,
   calculateTransitPlanets,
@@ -39,7 +40,19 @@ export interface HouseDetail {
   planets: HousePlanetDetail[];
 }
 
-export interface EnrichedChart extends LagnaChart {
+/** Sidereal degree-in-sign (0–30) matched to `planetary_avastha.degree_from` / `degree_to`. */
+export type PlanetAvasthaInfo = {
+  name: string | null;
+  englishName: string | null;
+  effectPercent: number | null;
+  degreeFrom: string | null;
+  degreeTo: string | null;
+};
+
+export type PlanetWithAvastha = PlanetPosition & { avastha: PlanetAvasthaInfo | null };
+
+export interface EnrichedChart extends Omit<LagnaChart, 'planets'> {
+  planets: PlanetWithAvastha[];
   houseDetails: HouseDetail[];
 }
 
@@ -122,6 +135,8 @@ export class BirthRecordsService implements OnModuleInit {
     private readonly repo: Repository<BirthRecord>,
     @InjectRepository(AiAnalysis)
     private readonly aiRepo: Repository<AiAnalysis>,
+    @InjectRepository(PlanetaryAvastha)
+    private readonly avasthaRepo: Repository<PlanetaryAvastha>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -255,6 +270,39 @@ export class BirthRecordsService implements OnModuleInit {
     return this.aiKnowledgePromise;
   }
 
+  private async loadPlanetaryAvasthaRows(): Promise<PlanetaryAvastha[]> {
+    return this.avasthaRepo.find({ order: { id: 'ASC' } });
+  }
+
+  /** Match planet’s degree within sign (0–30°) to reference rows. */
+  private matchPlanetaryAvastha(degreeInSign: number, rows: PlanetaryAvastha[]): PlanetaryAvastha | null {
+    const d = degreeInSign;
+    for (const row of rows) {
+      if (row.degreeFrom == null || row.degreeTo == null) continue;
+      const from = Number(row.degreeFrom);
+      const to = Number(row.degreeTo);
+      if (Number.isNaN(from) || Number.isNaN(to)) continue;
+      if (d >= from - 1e-6 && d <= to + 1e-6) return row;
+    }
+    return null;
+  }
+
+  private attachAvasthaToPlanets(planets: PlanetPosition[], rows: PlanetaryAvastha[]): PlanetWithAvastha[] {
+    return planets.map(p => {
+      const hit = this.matchPlanetaryAvastha(p.degreeInSign, rows);
+      const avastha: PlanetAvasthaInfo | null = hit
+        ? {
+            name: hit.name,
+            englishName: hit.englishName,
+            effectPercent: hit.effectPercent,
+            degreeFrom: hit.degreeFrom,
+            degreeTo: hit.degreeTo,
+          }
+        : null;
+      return { ...p, avastha };
+    });
+  }
+
   private buildHouseDetails(chart: LagnaChart, ref: RefData): HouseDetail[] {
     return chart.houses.map(h => {
       const sign      = ref.signMap.get(h.sign);
@@ -305,9 +353,11 @@ export class BirthRecordsService implements OnModuleInit {
     const chart   = calculateChart(year, month, day, hour, minute, second, lat, lon, record.timezone ?? '');
     const ref     = await this.loadRefData();
     const houseDetails = this.buildHouseDetails(chart, ref);
+    const avasthaRows = await this.loadPlanetaryAvasthaRows();
+    const planets = this.attachAvasthaToPlanets(chart.planets, avasthaRows);
 
     this.logger.log(`getChart: done id=${id} lagna=${chart.lagna.sign}`);
-    return { ...chart, houseDetails };
+    return { ...chart, planets, houseDetails };
   }
 
   async getMoonChart(id: number): Promise<EnrichedChart> {
@@ -355,9 +405,11 @@ export class BirthRecordsService implements OnModuleInit {
 
     const ref          = await this.loadRefData();
     const houseDetails = this.buildHouseDetails(moonChart, ref);
+    const avasthaRows = await this.loadPlanetaryAvasthaRows();
+    const planets = this.attachAvasthaToPlanets(moonChart.planets, avasthaRows);
 
     this.logger.log(`getMoonChart: done id=${id} moonLagna=${moonChart.lagna.sign}`);
-    return { ...moonChart, houseDetails };
+    return { ...moonChart, planets, houseDetails };
   }
 
   /** Transit houses are always whole-sign from the natal Moon sign (Chandra Lagna). */

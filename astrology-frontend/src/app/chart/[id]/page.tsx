@@ -22,6 +22,13 @@ interface PlanetPosition {
   house: number;
   isRetrograde: boolean;
   dignity: string[];
+  avastha?: {
+    name: string | null;
+    englishName: string | null;
+    effectPercent: number | null;
+    degreeFrom: string | null;
+    degreeTo: string | null;
+  } | null;
 }
 
 interface HouseInfo {
