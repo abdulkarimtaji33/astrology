@@ -17,7 +17,13 @@ async function bootstrap() {
   app.useGlobalInterceptors(new HttpLoggingInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableCors();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
   const port = process.env.PORT || 6000;
   await app.listen(port);
   const httpServer = app.getHttpServer() as import('node:http').Server;

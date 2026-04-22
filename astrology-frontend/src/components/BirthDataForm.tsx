@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
+import { saveRecentChart } from '@/components/RecentCharts';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -83,6 +84,12 @@ export default function BirthDataForm() {
         timezone: selectedCity?.timezone ?? undefined,
       };
       const res = await api.post<{ id: number }>('/birth-records', payload);
+      saveRecentChart({
+        id: res.data.id,
+        name: data.name,
+        birthDate: data.birthDate,
+        cityName: payload.cityName,
+      });
       router.push(`/chart/${res.data.id}`);
     } catch {
       setStatus('error');
@@ -90,7 +97,7 @@ export default function BirthDataForm() {
   };
 
   const inputClass =
-    'w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder:text-white/40 focus:border-amber-400/60 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
+    'w-full rounded-xl border border-white/15 bg-slate-900/60 px-4 py-3 text-white placeholder:text-white/35 transition focus:border-amber-400/70 focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:bg-slate-900/80';
 
   return (
     <form

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import OpenAI from 'openai';
 import { CreateBirthRecordDto } from './dto/create-birth-record.dto';
@@ -73,23 +75,17 @@ export interface GemstoneAdvice {
   reason: string;
 }
 
-export interface TransitMetric {
-  percentage: number;
-  explanation: string;
-}
-
-export interface InvestmentMetric {
-  level: string;
-  percentage: number;
-  explanation: string;
+export interface ThemeAnalysis {
+  lifeAnalysis: string;
+  transitAnalysis: string;
 }
 
 export interface AiAnalysisResult {
-  lifeGeneral: string;
-  personality: string;
-  wealth: string;
-  familyLife: string;
-  marriageLife: string;
+  lifeGeneral: ThemeAnalysis;
+  personality: ThemeAnalysis;
+  wealth: ThemeAnalysis;
+  familyLife: ThemeAnalysis;
+  marriageLife: ThemeAnalysis;
   strongAreas: string[];
   weakAreas: string[];
   recommendedGemstones: GemstoneAdvice[];
@@ -97,10 +93,6 @@ export interface AiAnalysisResult {
   transitPeriod: string;
   transitOverview: string;
   dashaAnalysis: string;
-  investmentRisk: InvestmentMetric;
-  jobOpportunity: TransitMetric;
-  marriageLikelihood: TransitMetric;
-  goodHealthLikelihood: TransitMetric;
 }
 
 export interface HouseAiResult {
@@ -122,6 +114,8 @@ const PLANET_DB_ID: Record<PlanetName, number> = {
 @Injectable()
 export class BirthRecordsService implements OnModuleInit {
   private readonly logger = new Logger(BirthRecordsService.name);
+  /** Cached text from ai-data/data.txt — used only for birth-chart AI, not world events. */
+  private aiKnowledgePromise: Promise<string> | null = null;
 
   constructor(
     @InjectRepository(BirthRecord)
@@ -243,6 +237,24 @@ export class BirthRecordsService implements OnModuleInit {
     return ref;
   }
 
+  private getAiKnowledgeText(): Promise<string> {
+    if (!this.aiKnowledgePromise) {
+      const path = join(process.cwd(), 'ai-data', 'data.txt');
+      this.aiKnowledgePromise = readFile(path, 'utf8')
+        .then(text => {
+          const s = text.trim();
+          this.logger.log(`getAiKnowledgeText: loaded ${s.length} chars from ${path}`);
+          return s;
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`getAiKnowledgeText: could not read ${path}: ${msg}`);
+          return '';
+        });
+    }
+    return this.aiKnowledgePromise;
+  }
+
   private buildHouseDetails(chart: LagnaChart, ref: RefData): HouseDetail[] {
     return chart.houses.map(h => {
       const sign      = ref.signMap.get(h.sign);
@@ -349,8 +361,8 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   /** Transit houses are always whole-sign from the natal Moon sign (Chandra Lagna). */
-  async getTransits(id: number, from: string, to: string): Promise<TransitResponse> {
-    this.logger.log(`getTransits: start id=${id} from=${from} to=${to}`);
+  async getTransits(id: number, from: string, to: string, basis: 'lagna' | 'moon' = 'lagna'): Promise<TransitResponse> {
+    this.logger.log(`getTransits: start id=${id} from=${from} to=${to} basis=${basis}`);
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" (YYYY-MM-DD) are required');
 
     const record = await this.loadRecord(id);
@@ -361,14 +373,11 @@ export class BirthRecordsService implements OnModuleInit {
 
     const natal = calculateChart(year, month, day, hour, minute, second, lat, lon, record.timezone ?? '');
 
-    const moon           = natal.planets.find(p => p.planet === 'Moon')!;
-    const lagnaSignIndex = moon.signIndex;
-    const basisLagna     = {
-      longitude: moon.longitude,
-      sign: moon.sign,
-      signIndex: moon.signIndex,
-      degreeInSign: moon.degreeInSign,
-    };
+    const moon = natal.planets.find(p => p.planet === 'Moon')!;
+    const lagnaSignIndex = basis === 'moon' ? moon.signIndex : natal.lagna.signIndex;
+    const basisLagna = basis === 'moon'
+      ? { longitude: moon.longitude, sign: moon.sign, signIndex: moon.signIndex, degreeInSign: moon.degreeInSign }
+      : { longitude: natal.lagna.longitude, sign: natal.lagna.sign, signIndex: natal.lagna.signIndex, degreeInSign: natal.lagna.degreeInSign };
 
     const fromMs  = new Date(from + 'T00:00:00Z').getTime();
     const toMs    = new Date(to   + 'T00:00:00Z').getTime();
@@ -376,7 +385,7 @@ export class BirthRecordsService implements OnModuleInit {
     if (fromMs > toMs) throw new BadRequestException('"from" must be ≤ "to"');
 
     const diffDays = Math.ceil((toMs - fromMs) / 86400000) + 1;
-    this.logger.log(`getTransits: computing ${diffDays} days chandraLagna=${basisLagna.sign}`);
+    this.logger.log(`getTransits: computing ${diffDays} days basis=${basis} sign=${basisLagna.sign}`);
 
     const days: TransitDayData[] = [];
     for (let i = 0; i < diffDays; i++) {
@@ -512,16 +521,52 @@ export class BirthRecordsService implements OnModuleInit {
     const changes: string[] = [];
     for (const planet of planets) {
       let prevSign: string | null = null;
+      let prevRetro: boolean | null = null;
       for (const day of days) {
         const pos = day.planets.find(p => p.planet === planet);
         if (!pos) continue;
         if (prevSign !== null && pos.sign !== prevSign) {
-          changes.push(`  ${planet}: ${prevSign} → ${pos.sign} on ${day.date}`);
+          const retroTag = pos.isRetrograde ? ' (retrograde)' : '';
+          changes.push(`  ${planet}${retroTag}: ${prevSign} → ${pos.sign} on ${day.date}`);
         }
-        prevSign = pos.sign;
+        if (prevRetro !== null && pos.isRetrograde !== prevRetro) {
+          const label = pos.isRetrograde ? 'goes retrograde' : 'goes direct';
+          changes.push(`  ${planet} ${label} on ${day.date} in ${pos.sign}`);
+        }
+        prevSign  = pos.sign;
+        prevRetro = pos.isRetrograde;
       }
     }
-    return changes.length ? changes.join('\n') : '  No sign changes in this period';
+    return changes.length ? changes.join('\n') : '  No sign changes or station changes in this period';
+  }
+
+  private fmtRetrogrades(days: TransitDayData[]): string {
+    if (!days.length) return '  (no data)';
+    const planets = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Rahu','Ketu'];
+    const lines: string[] = [];
+    // Find contiguous retrograde spans for each planet
+    for (const planet of planets) {
+      let spanStart: string | null = null;
+      let spanSign: string | null  = null;
+      for (const day of days) {
+        const pos = day.planets.find(p => p.planet === planet);
+        if (!pos) continue;
+        if (pos.isRetrograde && spanStart === null) {
+          spanStart = day.date;
+          spanSign  = pos.sign;
+        } else if (!pos.isRetrograde && spanStart !== null) {
+          lines.push(`  ${planet} RETROGRADE: ${spanStart} → ${day.date} (in ${spanSign})`);
+          spanStart = null;
+          spanSign  = null;
+        }
+      }
+      // Still retrograde at end of period
+      if (spanStart !== null) {
+        const lastDay = days[days.length - 1];
+        lines.push(`  ${planet} RETROGRADE: ${spanStart} → ${lastDay.date}+ (in ${spanSign}, continues beyond period)`);
+      }
+    }
+    return lines.length ? lines.join('\n') : '  No planets retrograde during this period';
   }
 
   private fmtPlanetRelationships(
@@ -563,6 +608,30 @@ export class BirthRecordsService implements OnModuleInit {
     return lines.join('\n');
   }
 
+  private fmtSaturnTransits(st: SaturnTransitResult | undefined): string {
+    if (!st) return '(not available)';
+    const lines = [`Natal Moon Sign: ${st.natalMoonSign}`];
+    if (!st.currentPeriod) {
+      lines.push('Currently: NOT in Sade Sati or Dhaiyya');
+    } else {
+      const cp = st.currentPeriod;
+      const type = cp.type === 'sade-sati'
+        ? `Sade Sati (${cp.phase} phase)`
+        : 'Dhaiyya';
+      lines.push(`Currently IN: ${type} — Saturn in ${cp.saturnSign} (${cp.startDate} → ${cp.endDate})`);
+    }
+    const relevant = st.periods.filter(p => p.isActive || (!p.isPast && new Date(p.startDate) < new Date(Date.now() + 365*24*60*60*1000*5)));
+    if (relevant.length) {
+      lines.push('Nearby Periods:');
+      for (const p of relevant) {
+        const label = p.type === 'sade-sati' ? `Sade Sati (${p.phase})` : 'Dhaiyya';
+        const status = p.isActive ? ' ← ACTIVE' : '';
+        lines.push(`  ${label.padEnd(22)} Saturn in ${p.saturnSign.padEnd(12)} ${p.startDate} → ${p.endDate}${status}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
   private buildPrompt(
     record: BirthRecord,
     lagna: EnrichedChart,
@@ -571,8 +640,11 @@ export class BirthRecordsService implements OnModuleInit {
     numerology: NumerologyResult,
     from: string,
     to: string,
-    relMap?: Map<string, number>,
-    mahadasha?: MahadashaResult,
+    relMap: Map<string, number> | undefined,
+    mahadasha: MahadashaResult | undefined,
+    saturnTransits: SaturnTransitResult | undefined,
+    knowledge: string,
+    basis: 'lagna' | 'moon' = 'lagna',
   ): string {
     this.logger.debug(`buildPrompt: ${record.name} ${from}–${to}`);
     const dateStr = record.birthDate instanceof Date
@@ -598,6 +670,15 @@ export class BirthRecordsService implements OnModuleInit {
     const firstDay = transit.days[0];
     const lastDay  = transit.days[transit.days.length - 1];
 
+    const knowledgeBlock =
+      knowledge.length > 0
+        ? `
+=== VEDIC REFERENCE KNOWLEDGE (natal chart interpretation only — house/planet effects, remedies, classical points; align with this when it matches the chart; do not use for mundane/world astrology) ===
+${knowledge}
+
+`
+        : '';
+
     return `You are an expert Vedic astrologer (Jyotish) providing a factual chart reading.
 
 TONE RULES — follow these strictly:
@@ -605,10 +686,12 @@ TONE RULES — follow these strictly:
 - Do NOT use motivational, encouraging, or consoling language. Do not say things like "you have great potential", "opportunities await", "with effort you can overcome", or any similar phrases.
 - Do NOT soften difficult placements. If a planet is debilitated, retrograde, combust, or in an enemy sign — state it plainly and describe the realistic effect.
 - Do NOT inflate the positive. If a placement is genuinely strong, say so. If it is mixed or weak, say so.
-- Percentages MUST vary widely based on the actual chart. Range the full 0–100 spectrum.
-- The investmentRisk percentage is NOT a fixed value. It must reflect a real analysis.
-- Dasha analysis is CRITICAL — the Mahadasha lord's natal strength, sign, house, and relationships to wealth/career houses must directly influence all percentage scores and the dashaAnalysis field.
+- Dasha analysis is CRITICAL — the Mahadasha lord's natal strength, sign, house, and relationships to wealth/career houses must directly inform the dashaAnalysis field and thematic sections.
 - Don't care about the "friend, enemy, neutral" that is given to you. it is just a relationship between two planets for gemstone recommendations.
+- Check retrogrades properly, combustions, debilitations and all the rules properly
+
+This knowledge will help you in your interpretations:
+${knowledgeBlock} 
 
 BIRTH DETAILS:
 Name: ${record.name}
@@ -646,19 +729,26 @@ Planes of Expression:
 ${planes}
 
 === TRANSIT ANALYSIS: ${from} to ${to} ===
-House Count Basis: Moon Sign — Chandra Lagna (${transit.natalLagna.sign})
+Transit Basis: ${basis === 'moon' ? `Chandra Lagna (Moon sign: ${transit.natalLagna.sign})` : `Lagna (Ascendant: ${lagna.lagna.sign})`}
+Houses in this transit are counted from the ${basis === 'moon' ? 'Moon sign' : 'Ascendant (Lagna)'}.
 
-Transit Positions at Start (${from}):
+Transit Positions at Start (${from}) — houses from ${basis === 'moon' ? `Moon (Chandra Lagna: ${transit.natalLagna.sign})` : `Lagna (${lagna.lagna.sign})`}:
 ${firstDay ? this.fmtPlanets(firstDay.planets) : 'N/A'}
 
-Transit Positions at End (${to}):
+Transit Positions at End (${to}) — houses from ${basis === 'moon' ? `Moon (Chandra Lagna: ${transit.natalLagna.sign})` : `Lagna (${lagna.lagna.sign})`}:
 ${lastDay ? this.fmtPlanets(lastDay.planets) : 'N/A'}
 
-Sign Changes During This Period:
+Retrograde Periods During This Transit:
+${this.fmtRetrogrades(transit.days)}
+
+Sign Changes & Station Changes During This Period:
 ${this.fmtSignChanges(transit.days)}
 
 === VIMSHOTTARI MAHADASHA ===
 ${mahadasha ? this.fmtMahadasha(mahadasha) : '(not available)'}
+
+=== SATURN SADE SATI / DHAIYYA ===
+${this.fmtSaturnTransits(saturnTransits)}
 
 === PLANET RELATIONSHIPS (Vedic Naisargika Maitri) ===
 ${relMap ? this.fmtPlanetRelationships(relMap) : '(not available)'}
@@ -677,19 +767,29 @@ GEMSTONE RULE:
 === OUTPUT INSTRUCTIONS ===
 Analyze ALL data above. Do not skip difficult placements — debilitations, retrogrades, combustions, malefics in sensitive houses, and afflicted house lords must all be addressed explicitly.
 
-For every percentage:
-- First determine the natal chart baseline (is the relevant house/lord strong, weak, or mixed?)
-- Then overlay the transit (are benefics or malefics transiting the relevant houses?)
-- Only after this multi-layer synthesis should you assign the number. NEVER default to any fixed percentage.
-
 Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
 {
-  "lifeGeneral": "<2-3 paragraphs: life path, core karma, key patterns. Name the specific ascendant lord, its placement, and what that concretely means. Address both strengths and problems in the chart without weighting either side.>",
-  "personality": "<2-3 paragraphs: temperament and behavior patterns from Lagna and Moon sign. Include negative traits where the chart shows them — e.g. impulsiveness, rigidity, emotional difficulty, etc.>",
-  "wealth": "<1-2 paragraphs: financial picture from 2nd and 11th houses, their lords, and any relevant yogas or afflictions. State clearly if the chart shows financial struggle, instability, or restriction, and why.>",
-  "familyLife": "<1-2 paragraphs: family relationships from 4th house. Include any karmic difficulties — estrangement, loss, tension — if shown by the chart.>",
-  "marriageLife": "<1-2 paragraphs: marriage prospects from 7th house lord, Venus, and relevant transits. State delays, complications, or incompatibility indicators if present.>",
+  "lifeGeneral": {
+    "lifeAnalysis": "<1 brief paragraph: natal life path, core karma, ascendant lord placement and what it means long-term>",
+    "transitAnalysis": "<1 brief paragraph: how the current transit period shapes the life path — which houses are activated and the realistic tone>"
+  },
+  "personality": {
+    "lifeAnalysis": "<1 brief paragraph: natal temperament and character from Lagna and Moon sign, including any notable negative traits>",
+    "transitAnalysis": "<1 brief paragraph: how current transits are affecting mood, behavior, and self-expression right now>"
+  },
+  "wealth": {
+    "lifeAnalysis": "<1 brief paragraph: natal financial picture from 2nd/11th houses, their lords, any yogas or afflictions>",
+    "transitAnalysis": "<1 brief paragraph: current transit effects on wealth — which planets activate or stress 2nd/11th houses now>"
+  },
+  "familyLife": {
+    "lifeAnalysis": "<1 brief paragraph: natal family dynamics from 4th house, including any karmic difficulties or strengths>",
+    "transitAnalysis": "<1 brief paragraph: current transit effects on home and family life>"
+  },
+  "marriageLife": {
+    "lifeAnalysis": "<1 brief paragraph: natal marriage prospects from 7th house lord and Venus — delays or strengths>",
+    "transitAnalysis": "<1 brief paragraph: current transit influence on relationships and marriage timing>"
+  },
   "strongAreas": ["<specific area supported by the chart>", ...],
   "weakAreas": ["<specific area with chart evidence>", ...],
   "recommendedGemstones": [
@@ -703,25 +803,8 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     {"name": "<gemstone 3>", "planet": "<planet 3>", "reason": "<why>"}
   ],
   "transitPeriod": "${from} to ${to}",
-  "transitOverview": "<2-3 paragraphs: factual account of major transit movements and their effects. State which houses are activated, which are stressed, and what the realistic tone of the period is — including if it is a difficult or restricted period.>",
-  "dashaAnalysis": "<2-3 paragraphs: analyze the current Mahadasha lord — its natal sign, house, dignity, and planetary relationships. Explain what themes dominate under this dasha (career, family, health, wealth, spirituality), any antardashas if determinable, and how this dasha interacts with the transit period. If the dasha lord is debilitated, combust, or in an enemy sign, state the concrete effects plainly.>",
-  "investmentRisk": {
-    "level": "<very risky | risky | neutral | good | excellent>",
-    "percentage": <integer 0–100 — synthesize natal 2nd/11th strength + Mahadasha lord quality + transit of Jupiter/Saturn over wealth houses. A strong dasha lord ruling 11th in own sign with benefic transits = 70–85%. A malefic dasha lord debilitated + Saturn transiting 2nd = 10–25%. NEVER output 30 without explicit justification.>,
-    "explanation": "<name the Mahadasha lord and its natal placement, then name which transit planets affect 2nd/11th houses, and how together they justify this score>"
-  },
-  "jobOpportunity": {
-    "percentage": <integer 0–100 — synthesize natal 10th house strength + whether Mahadasha lord rules or aspects 10th + transit of Jupiter/Saturn/Sun over 10th/6th. Strong dasha lord with Jupiter transiting 10th = 65–80%. Malefic dasha lord with Saturn on 10th = 15–35%.>,
-    "explanation": "<Mahadasha lord relationship to 10th house, plus transit planets over 10th/6th and their effect>"
-  },
-  "marriageLikelihood": {
-    "percentage": <integer 0–100 — synthesize natal 7th house strength + Venus placement + whether Mahadasha lord rules/aspects 7th + transit of Jupiter/Venus over 7th. Active Venus dasha with Jupiter transiting 7th = 70–85%. Saturn/Rahu dasha with malefic on 7th = 10–30%.>,
-    "explanation": "<7th house lord natally, Venus position, Mahadasha lord relation to 7th, current transit over 7th>"
-  },
-  "goodHealthLikelihood": {
-    "percentage": <integer 0–100 — synthesize natal 1st/6th/8th house state + Sun/Moon strength + whether Mahadasha lord is a natural malefic or benefic + transit malefics over 1st/6th/8th. Sun exalted + benefic dasha = 70–80%. Afflicted Moon + Rahu dasha + malefic transit on ascendant = 20–35%.>,
-    "explanation": "<natal lagna lord, Sun and Moon strength, Mahadasha lord nature, transit planets affecting 1st/6th/8th>"
-  }
+  "transitOverview": "<Structured transit reading covering every major area of life for the period ${from} to ${to}. For each area below, state in 1-2 sentences what the transits concretely show — name the transiting planet, the house it activates, and the real effect. Do not soften or genericize. If a period within the range is notably better or worse, call it out with approximate dates. Cover ALL of the following areas in order: (1) Career & Work — transits over 10th/6th/1st, Saturn/Jupiter/Sun movement; (2) Wealth, Finance & Losses — transits over 2nd/11th/12th, be blunt and clearly state the effects. 12th house is for loss, so clearly mention loss if it is there but dont if not; (3) Relationships & Marriage — transits over 7th, Venus/Jupiter movement; (4) Health & Energy — transits over 1st/6th/8th, Sun/Moon/Mars state; (5) Family & Home — transits over 4th, Moon/Mars influence; (6) Mental State & Emotions — Moon sign transits, Mercury, Rahu/Ketu axis; (7) Spiritual & Hidden Matters — transits over 8th/12th, Ketu/Saturn themes; (8) Overall Tone — summarize whether this is a period of growth, restriction, transition, or crisis based on the sum of all the above.>",
+  "dashaAnalysis": "<1 brief paragraph: analyze the current Mahadasha lord — its natal sign, house, dignity, and planetary relationships. Explain what themes dominate under this dasha (career, family, health, wealth, spirituality), any antardashas if determinable, and how this dasha interacts with the transit period. If the dasha lord is debilitated, combust, or in an enemy sign, state the concrete effects plainly.>"
 }`;
   }
 
@@ -730,19 +813,22 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     from: string,
     to: string,
     targetYear?: number,
+    basis: 'lagna' | 'moon' = 'lagna',
   ): Promise<AiAnalysisResult> {
-    this.logger.log(`getAiAnalysis: start id=${id} from=${from} to=${to} year=${targetYear ?? '—'}`);
+    this.logger.log(`getAiAnalysis: start id=${id} from=${from} to=${to} year=${targetYear ?? '—'} basis=${basis}`);
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" are required');
 
-    this.logger.log('getAiAnalysis: parallel load chart, moon, transits, numerology, record, ref, mahadasha');
-    const [lagnaChart, moonChart, transitData, numerology, record, ref, mahadasha] = await Promise.all([
+    this.logger.log('getAiAnalysis: parallel load chart, moon, transits, numerology, record, ref, mahadasha, saturn, ai-knowledge');
+    const [lagnaChart, moonChart, transitData, numerology, record, ref, mahadasha, saturnTransits, knowledge] = await Promise.all([
       this.getChart(id),
       this.getMoonChart(id),
-      this.getTransits(id, from, to),
+      this.getTransits(id, from, to, basis),
       this.getNumerology(id, targetYear),
       this.loadRecord(id),
       this.loadRefData(),
       this.getMahadasha(id),
+      this.getSaturnTransits(id),
+      this.getAiKnowledgeText(),
     ]);
     this.logger.log(
       `getAiAnalysis: data loaded transitDays=${transitData.days.length} promptInputs=ok`,
@@ -756,7 +842,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
     const model  = 'gpt-5-mini';
     const openai = new OpenAI({ apiKey });
-    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, ref.relMap, mahadasha);
+    const prompt = this.buildPrompt(record, lagnaChart, moonChart, transitData, numerology, from, to, ref.relMap, mahadasha, saturnTransits, knowledge, basis);
     this.logger.log(`getAiAnalysis: prompt built chars=${prompt.length}`);
 
     let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>;
@@ -768,7 +854,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         // temperature: 0.7,
-        max_completion_tokens: 3000,
+        max_completion_tokens: 16000,
       });
       this.logger.log(`getAiAnalysis: OpenAI ok ${Date.now() - t0}ms usage=${JSON.stringify(completion.usage ?? {})}`);
     } catch (err: unknown) {
@@ -788,7 +874,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
         birthRecordId: id,
         transitFrom:   from,
         transitTo:     to,
-        basis:         'moon',
+        basis,
         model,
         prompt,
         response: content,
@@ -818,9 +904,10 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     if (house < 1 || house > 12) throw new BadRequestException('house must be 1–12');
     this.logger.log(`getHouseAiAnalysis: id=${id} house=${house} chart=${chartKind}`);
 
-    const [chart, record] = await Promise.all([
+    const [chart, record, knowledge] = await Promise.all([
       chartKind === 'moon' ? this.getMoonChart(id) : this.getChart(id),
       this.loadRecord(id),
+      this.getAiKnowledgeText(),
     ]);
     const detail = chart.houseDetails.find(hd => hd.house === house);
     if (!detail) throw new NotFoundException(`House ${house} not found`);
@@ -843,7 +930,15 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     const houseBlock = this.fmtHouses([detail]);
     const planetsContext = this.fmtPlanets(chart.planets);
 
-    const prompt = `You are a Vedic (Jyotish) astrologer. Interpret a single house for this native using whole-sign houses and Lahiri ayanamsa.
+    const knowledgeBlock =
+      knowledge.length > 0
+        ? `=== VEDIC REFERENCE KNOWLEDGE ===
+${knowledge}
+
+`
+        : '';
+
+    const prompt = `${knowledgeBlock} You are a Vedic (Jyotish) astrologer. Interpret a single house for this native using whole-sign houses and Lahiri ayanamsa.
 
 Native name: ${record.name}
 Chart: ${chartNote}
@@ -857,12 +952,12 @@ House to interpret:
 ${houseBlock}
 
 === INSTRUCTIONS ===
-Explain what this house configuration means in practice: sign on the cusp, house lord (signLord), planets in the house, their dignity badges, retrogression, and relationship to the house lord (own/friend/enemy/neutral). Tie insights to classic house meanings. Be specific to the data — avoid generic text. Mention challenges where the chart shows them.
+Explain what this house configuration means in practice: Be specific to the data — avoid generic text. Mention opportunities and challenges where the chart shows them. give brief suggestions.
 
 Return ONLY valid JSON (no markdown):
 {
-  "interpretation": "<2-4 paragraphs, plain text>",
-  "keyThemes": ["<3-8 short bullet themes>"]
+  "interpretation": "<1 brief paragraph, plain text>",
+  "keyThemes": ["<3-4 short bullet themes>"]
 }`;
 
     const model = 'gpt-5-mini';
@@ -874,7 +969,7 @@ Return ONLY valid JSON (no markdown):
         model,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 6000,
+        max_completion_tokens: 16000,
       });
       this.logger.log(`getHouseAiAnalysis: OpenAI ok ${Date.now() - t0}ms`);
     } catch (err: unknown) {

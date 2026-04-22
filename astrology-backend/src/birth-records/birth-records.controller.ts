@@ -55,8 +55,9 @@ export class BirthRecordsController {
     @Param('id', ParseIntPipe) id: number,
     @Query('from') from: string,
     @Query('to') to: string,
+    @Query('basis') basis?: string,
   ) {
-    return this.service.getTransits(id, from, to);
+    return this.service.getTransits(id, from, to, basis === 'moon' ? 'moon' : 'lagna');
   }
 
   @Get(':id/ai-analysis')
@@ -65,9 +66,10 @@ export class BirthRecordsController {
     @Query('from') from: string,
     @Query('to') to: string,
     @Query('year') year?: string,
+    @Query('basis') basis?: string,
   ) {
     const targetYear = year ? parseInt(year, 10) : undefined;
-    return this.service.getAiAnalysis(id, from, to, targetYear);
+    return this.service.getAiAnalysis(id, from, to, targetYear, basis === 'moon' ? 'moon' : 'lagna');
   }
 
   @Get(':id/ai-analyses')

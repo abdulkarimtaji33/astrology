@@ -169,3 +169,30 @@ CREATE TABLE `zodiac_signs` (
   PRIMARY KEY (`id`),
   KEY `ruled_by` (`ruled_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `planet_house_interpretations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `planet_id` int(11) NOT NULL,
+  `house_id` int(11) NOT NULL,
+  `interpretation` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_planet_house` (`planet_id`,`house_id`),
+  KEY `fk_phi_house` (`house_id`),
+  CONSTRAINT `phi_planet` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `phi_house` FOREIGN KEY (`house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `planet_drishti` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `planet_id` int(11) NOT NULL,
+  `occupant_house_id` int(11) NOT NULL,
+  `aspected_house_id` int(11) NOT NULL,
+  `sort_order` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_occupant_aspect` (`planet_id`,`occupant_house_id`,`aspected_house_id`),
+  KEY `pd_occ` (`occupant_house_id`),
+  KEY `pd_asp` (`aspected_house_id`),
+  CONSTRAINT `pd_planet` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pd_occ` FOREIGN KEY (`occupant_house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pd_asp` FOREIGN KEY (`aspected_house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -40,6 +40,7 @@ coverage/
 
 # Misc
 .cache/
+astrology-backend/ai-data/
 
 # Claude Code local settings
 .claude/

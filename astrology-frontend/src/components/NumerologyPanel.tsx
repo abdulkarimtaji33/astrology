@@ -207,8 +207,8 @@ export default function NumerologyPanel({ chartId }: { chartId: string }) {
 
         {/* Lo Shu Grid */}
         <div className="flex flex-col gap-3 lg:shrink-0">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
-            <p className="mb-4 text-xs font-medium uppercase tracking-widest text-white/40">
+          <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] p-5 backdrop-blur-md">
+            <p className="mb-4 border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
               Lo Shu Grid
             </p>
             <LoShuGrid grid={data.loShuGrid} />
@@ -219,34 +219,48 @@ export default function NumerologyPanel({ chartId }: { chartId: string }) {
         {/* Number summary */}
         <div className="flex flex-1 flex-col gap-3">
           {[
-            { label: 'Driver Number',    value: data.driverNumber,    color: 'text-amber-300',   border: 'border-amber-400/30',   bg: 'bg-amber-400/8'   },
-            { label: 'Conductor Number', value: data.conductorNumber, color: 'text-indigo-300',  border: 'border-indigo-400/30',  bg: 'bg-indigo-400/8'  },
-            { label: `Personal Year ${data.targetYear}`, value: data.personalYear, color: 'text-emerald-300', border: 'border-emerald-400/30', bg: 'bg-emerald-400/8' },
+            { label: 'Driver Number',    value: data.driverNumber,    color: 'text-amber-300',   border: 'border-amber-400/30',   bg: 'bg-gradient-to-b from-amber-400/10 to-amber-400/5',   meaning: data.driverMeaning    },
+            { label: 'Conductor Number', value: data.conductorNumber, color: 'text-indigo-300',  border: 'border-indigo-400/30',  bg: 'bg-gradient-to-b from-indigo-400/10 to-indigo-400/5',  meaning: data.conductorMeaning },
+            { label: `Personal Year ${data.targetYear}`, value: data.personalYear, color: 'text-emerald-300', border: 'border-emerald-400/30', bg: 'bg-gradient-to-b from-emerald-400/10 to-emerald-400/5', meaning: data.personalYearMeaning },
           ].map(item => (
             <div key={item.label}
-              className={`flex items-center gap-5 rounded-2xl border ${item.border} ${item.bg} px-6 py-4`}>
-              <span className={`text-5xl font-bold tabular-nums leading-none ${item.color}`}>
+              className={`flex items-start gap-5 rounded-2xl border ${item.border} ${item.bg} px-6 py-4`}>
+              <span className={`text-5xl font-bold tabular-nums leading-none shrink-0 pt-1 ${item.color}`}>
                 {item.value}
               </span>
-              <p className="text-xs font-medium uppercase tracking-widest text-white/40">{item.label}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-widest text-white/40">{item.label}</p>
+                {item.meaning?.title && (
+                  <p className={`mt-1 text-sm font-semibold ${item.color}`}>{item.meaning.title}</p>
+                )}
+                {item.meaning?.keywords && (
+                  <p className="mt-0.5 text-xs leading-relaxed text-white/50">{item.meaning.keywords}</p>
+                )}
+              </div>
             </div>
           ))}
 
           {/* Name number (Chaldean) */}
-          <div className="flex items-center gap-5 rounded-2xl border border-violet-400/30 bg-violet-400/8 px-6 py-4">
-            <span className="text-5xl font-bold tabular-nums leading-none text-violet-300">
+          <div className="flex items-start gap-5 rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-400/10 to-violet-400/5 px-6 py-4">
+            <span className="text-5xl font-bold tabular-nums leading-none shrink-0 pt-1 text-violet-300">
               {data.nameNumber}
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-widest text-white/40">
                 Name Number · Chaldean
               </p>
-              <p className="mt-1 text-xs text-white/25">
+              <p className="mt-0.5 text-xs text-white/25">
                 {data.name}
                 <span className="ml-2 tabular-nums text-violet-400/60">
                   (total {data.nameCompound})
                 </span>
               </p>
+              {data.nameNumberMeaning?.title && (
+                <p className="mt-1 text-sm font-semibold text-violet-300">{data.nameNumberMeaning.title}</p>
+              )}
+              {data.nameNumberMeaning?.keywords && (
+                <p className="mt-0.5 text-xs leading-relaxed text-white/50">{data.nameNumberMeaning.keywords}</p>
+              )}
             </div>
           </div>
         </div>

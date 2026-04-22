@@ -56,9 +56,132 @@ interface TransitResponse {
   days: TransitDayData[];
 }
 
+// ─── Summary strip types ────────────────────────────────────────────────────
+interface DashaPeriod {
+  planet: string;
+  startDate: string;
+  endDate: string;
+  isCurrent: boolean;
+}
+interface MahadashaResult {
+  moonNakshatra: string;
+  periods: DashaPeriod[];
+}
+interface NumerologyResult {
+  personalYear: number;
+  targetYear: number;
+  driverNumber: number;
+}
+interface SaturnResult {
+  isInSadeSati: boolean;
+  isInDhaiyya: boolean;
+  currentPeriod: { type: string; phase?: string; startDate: string; endDate: string } | null;
+}
+
+const PLANET_SYMBOL_SM: Record<string, string> = {
+  Sun:'☉', Moon:'☽', Mercury:'☿', Venus:'♀',
+  Mars:'♂', Jupiter:'♃', Saturn:'♄', Rahu:'☊', Ketu:'☋',
+};
+const PLANET_COLOR_TEXT: Record<string, string> = {
+  Sun: 'text-amber-300', Moon: 'text-slate-200', Mars: 'text-red-400',
+  Mercury: 'text-emerald-300', Jupiter: 'text-yellow-300', Venus: 'text-pink-300',
+  Saturn: 'text-indigo-300', Rahu: 'text-purple-300', Ketu: 'text-orange-300',
+};
+
+function AstroSummaryStrip({ chartId }: { chartId: string }) {
+  const { data: maha } = useQuery<MahadashaResult>({
+    queryKey: ['mahadasha', chartId],
+    queryFn: () => api.get<MahadashaResult>(`/birth-records/${chartId}/mahadasha`).then(r => r.data),
+  });
+  const { data: num } = useQuery<NumerologyResult>({
+    queryKey: ['numerology', chartId],
+    queryFn: () => api.get<NumerologyResult>(`/birth-records/${chartId}/numerology`).then(r => r.data),
+  });
+  const { data: saturn } = useQuery<SaturnResult>({
+    queryKey: ['saturn-transits', chartId],
+    queryFn: () => api.get<SaturnResult>(`/birth-records/${chartId}/saturn-transits`).then(r => r.data),
+  });
+
+  const currentDasha = maha?.periods.find(p => p.isCurrent);
+  const dashaColor   = currentDasha ? (PLANET_COLOR_TEXT[currentDasha.planet] ?? 'text-white/80') : 'text-white/40';
+
+  const saturnActive = saturn?.isInSadeSati || saturn?.isInDhaiyya;
+  const saturnLabel  = saturn?.isInSadeSati ? 'Sade Sati' : saturn?.isInDhaiyya ? 'Dhaiyya' : 'Neither';
+  const saturnPhase  = saturn?.currentPeriod?.phase
+    ? ` · ${saturn.currentPeriod.phase.charAt(0).toUpperCase() + saturn.currentPeriod.phase.slice(1)}`
+    : '';
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      {/* Mahadasha chip */}
+      <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/8 text-sm">
+          {currentDasha ? PLANET_SYMBOL_SM[currentDasha.planet] ?? '♄' : '…'}
+        </div>
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-widest text-white/35">Mahadasha</p>
+          {currentDasha ? (
+            <p className={`text-sm font-semibold leading-tight ${dashaColor}`}>
+              {currentDasha.planet} Dasha
+              <span className="ml-1.5 text-[11px] font-normal text-white/35">
+                until {currentDasha.endDate.slice(0, 7)}
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm text-white/30">—</p>
+          )}
+        </div>
+      </div>
+
+      {/* Personal Year chip */}
+      <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-lg font-bold text-emerald-300 tabular-nums">
+          {num ? num.personalYear : '…'}
+        </div>
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-widest text-white/35">Personal Year</p>
+          <p className="text-sm font-semibold leading-tight text-emerald-300">
+            Year {num?.personalYear ?? '—'}
+            <span className="ml-1.5 text-[11px] font-normal text-white/35">
+              {num ? `(${num.targetYear})` : ''}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* Saturn chip */}
+      <div className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 ${
+        saturnActive
+          ? saturn?.isInSadeSati
+            ? 'border-red-400/30 bg-gradient-to-b from-red-500/10 to-red-500/5'
+            : 'border-orange-400/30 bg-gradient-to-b from-orange-500/10 to-orange-500/5'
+          : 'border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03]'
+      }`}>
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm ${
+          saturnActive
+            ? saturn?.isInSadeSati ? 'bg-red-500/15 text-red-300' : 'bg-orange-500/15 text-orange-300'
+            : 'bg-white/8 text-indigo-300'
+        }`}>
+          ♄
+        </div>
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-widest text-white/35">Saturn</p>
+          <p className={`text-sm font-semibold leading-tight ${
+            saturnActive
+              ? saturn?.isInSadeSati ? 'text-red-300' : 'text-orange-300'
+              : 'text-white/50'
+          }`}>
+            {saturn ? saturnLabel + saturnPhase : '…'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Form schema ───────────────────────────────────────────────────────────
-const today     = new Date().toISOString().slice(0, 10);
-const in30Days  = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+const today    = new Date().toISOString().slice(0, 10);
+const in30Days = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 
 const schema = z.object({
   from: z.string().min(1, 'Start date required'),
@@ -89,6 +212,13 @@ const REL_BADGE: Record<PlanetRel, string> = {
   neutral:  'bg-white/10 text-white/45 border-white/15',
 };
 
+const REL_TO_LORD_HINT: Record<PlanetRel, string> = {
+  own:      'Own sign — planet is the lord here',
+  friendly: 'Friendly toward sign lord',
+  enemy:    'Inimical toward sign lord',
+  neutral:  'Neutral toward sign lord',
+};
+
 // ─── Transit comparison table ──────────────────────────────────────────────
 function TransitTable({
   transitPlanets,
@@ -103,9 +233,9 @@ function TransitTable({
   const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-md overflow-hidden">
+    <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
       <div className="px-5 pt-5 pb-3">
-        <h2 className="text-sm font-medium uppercase tracking-widest text-white/40">
+        <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
           Transit vs Natal
         </h2>
       </div>
@@ -114,11 +244,10 @@ function TransitTable({
           <thead>
             <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/30">
               <th className="px-4 py-2.5">Planet</th>
-              <th className="px-3 py-2.5">Transit Sign</th>
-              <th className="px-3 py-2.5">Sign Lord</th>
+              <th className="px-3 py-2.5 max-w-[150px]">Transit sign · lord</th>
               <th className="px-3 py-2.5">Transit House</th>
               <th className="px-3 py-2.5 min-w-[140px]">House Theme</th>
-              <th className="px-3 py-2.5">vs Lord</th>
+              <th className="px-3 py-2.5 max-w-[120px]">vs sign lord</th>
               <th className="px-3 py-2.5">Natal Sign</th>
               <th className="px-3 py-2.5">Natal House</th>
               <th className="px-3 py-2.5">Dignity</th>
@@ -138,68 +267,62 @@ function TransitTable({
 
               return (
                 <tr key={tp.planet}
-                  className="border-b border-white/5 transition hover:bg-white/[0.03]">
-
-                  {/* Planet */}
+                  className="border-b border-white/5 transition-colors duration-150 hover:bg-white/[0.05]">
                   <td className="px-4 py-3 font-medium text-white/90">
-                    <span className="mr-2 text-base">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
+                    <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
                     {tp.planet}
                     {tp.isRetrograde && (
-                      <span className="ml-1.5 rounded bg-orange-400/20 px-1 py-0.5 text-[10px] text-orange-300">℞</span>
+                      <span className="ml-1.5 rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
                     )}
                   </td>
-
-                  {/* Transit sign */}
                   <td className="px-3 py-3">
-                    <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>
-                      {tp.sign}
-                    </span>
-                    <span className="ml-2 text-xs tabular-nums text-white/40">
-                      {tp.degreeInSign.toFixed(1)}°
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span>
+                        <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>
+                          {tp.sign}
+                        </span>
+                        <span className="ml-2 text-xs tabular-nums text-white/40">
+                          {tp.degreeInSign.toFixed(1)}°
+                        </span>
+                      </span>
+                      {hi?.signLord && (
+                        <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>
+                      )}
+                    </div>
                   </td>
-
-                  {/* Sign lord (of transit sign / house cusp) */}
-                  <td className="px-3 py-3 text-xs text-cyan-300/90">
-                    {hi?.signLord ?? '—'}
-                  </td>
-
-                  {/* Transit house */}
                   <td className="px-3 py-3">
                     <span className={houseChanged ? 'text-amber-300 font-semibold tabular-nums' : 'tabular-nums text-white/60'}>
                       H{tp.house}
                     </span>
                   </td>
-
-                  {/* House theme */}
                   <td className="px-3 py-3 max-w-[200px]">
                     <p className="text-xs leading-snug text-white/70 line-clamp-2" title={hi?.represents}>
                       {hi?.mainTheme ?? '—'}
                     </p>
                   </td>
-
-                  {/* Planet vs sign lord (naisargika) */}
-                  <td className="px-3 py-3">
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}>
+                  <td className="px-3 py-3 max-w-[120px]">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
+                      title={REL_TO_LORD_HINT[rel]}
+                    >
                       {rel}
                     </span>
+                    {hi?.signLord && (
+                      <p className="mt-1 text-[10px] leading-tight text-white/35">
+                        {tp.planet} → {hi.signLord}
+                      </p>
+                    )}
                   </td>
-
-                  {/* Natal sign */}
                   <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
                     {natal ? (
                       <span>{natal.sign} <span className="text-xs text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
                     ) : '—'}
                   </td>
-
-                  {/* Natal house */}
                   <td className="px-3 py-3 tabular-nums text-white/40">
                     {natal ? `H${natal.house}` : '—'}
                   </td>
-
-                  {/* Dignity */}
                   <td className="px-3 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs capitalize ${DIGNITY_BADGE[dignityKey]}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
                       {dignityKey}
                     </span>
                   </td>
@@ -215,8 +338,6 @@ function TransitTable({
 
 // ─── Planet sign-change summary ────────────────────────────────────────────
 function SignChangeSummary({ days }: { days: TransitDayData[] }) {
-  const [open, setOpen] = useState(false);
-
   type Change = { planet: string; date: string; from: string; to: string };
   const changes: Change[] = [];
 
@@ -235,35 +356,187 @@ function SignChangeSummary({ days }: { days: TransitDayData[] }) {
   if (changes.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center justify-between px-5 py-4 text-left">
-        <span className="text-xs font-medium uppercase tracking-widest text-white/40">
+    <details className="rounded-2xl border border-white/10 bg-white/5">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-xs font-medium uppercase tracking-widest text-white/40">
+        <span>
           Sign Changes in Range
           <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[10px] normal-case tabular-nums text-white/40">
             {changes.length}
           </span>
         </span>
-        <span className={`text-white/30 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
-          ▾
-        </span>
-      </button>
+        <span className="text-white/30">▾</span>
+      </summary>
+      <div className="flex flex-wrap gap-2 border-t border-white/8 px-5 pb-4 pt-3">
+        {changes.map((c, i) => (
+          <div key={i}
+            className="flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs">
+            <span className="mr-0.5">{PLANET_SYMBOL[c.planet] ?? ''}</span>
+            <span className="font-medium text-amber-300">{c.planet}</span>
+            <span className="text-white/40">{c.from} → {c.to}</span>
+            <span className="text-white/30">{c.date}</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
 
-      {open && (
-        <div className="flex flex-wrap gap-2 border-t border-white/8 px-5 pb-4 pt-3">
-          {changes.map((c, i) => (
-            <div key={i}
-              className="flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs">
-              <span className="mr-0.5">{PLANET_SYMBOL[c.planet] ?? ''}</span>
-              <span className="font-medium text-amber-300">{c.planet}</span>
-              <span className="text-white/40">{c.from} → {c.to}</span>
-              <span className="text-white/30">{c.date}</span>
-            </div>
-          ))}
-        </div>
-      )}
+// ─── House view ────────────────────────────────────────────────────────────
+function HouseView({
+  planets,
+  houseInfo,
+  natalPlanets,
+  date,
+}: {
+  planets: TransitPlanet[];
+  houseInfo: TransitHouseInfo[];
+  natalPlanets: TransitPlanet[];
+  date: string;
+}) {
+  const natalMap   = new Map(natalPlanets.map(p => [p.planet, p]));
+  const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
+
+  // Build all 12 houses; within each, sort planets by name
+  const allHouses = Array.from({ length: 12 }, (_, i) => i + 1).map(h => ({
+    house: h,
+    hi: houseByNum.get(h),
+    transiting: planets.filter(p => p.house === h).sort((a, b) => a.planet.localeCompare(b.planet)),
+  }));
+
+  return (
+    <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
+      <div className="px-5 pt-5 pb-3">
+        <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
+          Transit by House — {date}
+        </h2>
+        <p className="mt-1 pl-5 text-[11px] text-white/30">Houses from Moon sign (Chandra Lagna) · all 12 houses in order</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/30">
+              <th className="px-4 py-2.5">House</th>
+              <th className="px-3 py-2.5 min-w-[140px]">Theme</th>
+              <th className="px-3 py-2.5">Planet</th>
+              <th className="px-3 py-2.5 max-w-[150px]">Transit Sign · Lord</th>
+              <th className="px-3 py-2.5 max-w-[120px]">vs Sign Lord</th>
+              <th className="px-3 py-2.5">Natal Sign</th>
+              <th className="px-3 py-2.5">Natal House</th>
+              <th className="px-3 py-2.5">Dignity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allHouses.map(({ house, hi, transiting }) => {
+              const isEmpty = transiting.length === 0;
+
+              if (isEmpty) {
+                return (
+                  <tr key={`h-${house}`} className="border-b border-white/5">
+                    <td className="px-4 py-3 border-r border-white/8">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-xl font-bold tabular-nums leading-none text-white/70">{house}</span>
+                        {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
+                        {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 border-r border-white/8">
+                      <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
+                      <p className="mt-0.5 text-[10px] text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
+                    </td>
+                    <td colSpan={6} className="px-3 py-3 text-xs text-white/30">—</td>
+                  </tr>
+                );
+              }
+
+              return transiting.map((tp, pi) => {
+                const natal       = natalMap.get(tp.planet);
+                const signChanged = natal && tp.sign !== natal.sign;
+                const dignityKey  = tp.dignity.includes('exalted')     ? 'exalted'
+                  : tp.dignity.includes('debilitated') ? 'debilitated'
+                  : tp.dignity.includes('own')         ? 'own'          : 'neutral';
+                const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
+
+                return (
+                  <tr key={`${house}-${tp.planet}`}
+                    className="border-b border-white/5 transition-colors duration-150 hover:bg-white/[0.05]">
+
+                    {/* House — merged across all planets in this house */}
+                    {pi === 0 && (
+                      <td rowSpan={transiting.length} className="px-4 py-3 align-middle border-r border-white/8">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-xl font-bold tabular-nums leading-none text-amber-300">{house}</span>
+                          {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
+                          {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
+                        </div>
+                      </td>
+                    )}
+
+                    {/* Theme — merged */}
+                    {pi === 0 && (
+                      <td rowSpan={transiting.length} className="px-3 py-3 align-middle border-r border-white/8 max-w-[180px]">
+                        <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
+                        <p className="mt-0.5 text-[10px] text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
+                      </td>
+                    )}
+
+                    {/* Planet */}
+                    <td className="px-4 py-3 font-medium text-white/90">
+                      <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
+                      {tp.planet}
+                      {tp.isRetrograde && (
+                        <span className="ml-1.5 rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
+                      )}
+                    </td>
+
+                    {/* Transit sign · lord */}
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span>
+                          <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>{tp.sign}</span>
+                          <span className="ml-2 text-xs tabular-nums text-white/40">{tp.degreeInSign.toFixed(1)}°</span>
+                        </span>
+                        {hi?.signLord && <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>}
+                      </div>
+                    </td>
+
+                    {/* vs sign lord */}
+                    <td className="px-3 py-3">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
+                        title={REL_TO_LORD_HINT[rel]}
+                      >
+                        {rel}
+                      </span>
+                      {hi?.signLord && (
+                        <p className="mt-1 text-[10px] leading-tight text-white/35">{tp.planet} → {hi.signLord}</p>
+                      )}
+                    </td>
+
+                    {/* Natal sign */}
+                    <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
+                      {natal
+                        ? <span>{natal.sign} <span className="text-xs text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
+                        : '—'}
+                    </td>
+
+                    {/* Natal house */}
+                    <td className="px-3 py-3 tabular-nums text-white/40">
+                      {natal ? `H${natal.house}` : '—'}
+                    </td>
+
+                    {/* Dignity */}
+                    <td className="px-3 py-3">
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
+                        {dignityKey}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              });
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -275,9 +548,10 @@ interface Props {
 }
 
 export default function TransitPanel({ chartId, natalLagna }: Props) {
-  const [queryParams, setQueryParams] = useState<{ from: string; to: string } | null>(null);
+  const [queryParams, setQueryParams] = useState<{ from: string; to: string }>({ from: today, to: in30Days });
+  const [basis, setBasis]             = useState<'lagna' | 'moon'>('lagna');
   const [dayIndex, setDayIndex]       = useState(0);
-  const [view, setView]               = useState<'chart' | 'table'>('chart');
+  const [view, setView]               = useState<'chart' | 'table' | 'houses'>('chart');
 
   const queryClient = useQueryClient();
 
@@ -296,12 +570,11 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
   };
 
   const handleAiAnalysis = async () => {
-    if (!queryParams) return;
-    openModal(`${queryParams.from} to ${queryParams.to}`);
+    openModal(`${queryParams.from} to ${queryParams.to} · ${basis === 'moon' ? 'Moon basis' : 'Lagna basis'}`);
     setAiLoading(true);
     try {
       const res = await api.get<AiAnalysisResult>(
-        `/birth-records/${chartId}/ai-analysis?from=${queryParams.from}&to=${queryParams.to}`,
+        `/birth-records/${chartId}/ai-analysis?from=${queryParams.from}&to=${queryParams.to}&basis=${basis}`,
         { timeout: 10 * 60 * 1000 },
       );
       setAiData(res.data);
@@ -314,7 +587,7 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
   };
 
   const handleViewPast = async (item: AiAnalysisSummary) => {
-    openModal(`${item.transitFrom} to ${item.transitTo}`);
+    openModal(`${item.transitFrom} to ${item.transitTo} · ${item.basis === 'moon' ? 'Moon basis' : 'Lagna basis'}`);
     setAiLoading(true);
     try {
       const res = await api.get<AiAnalysisResult>(
@@ -343,14 +616,13 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
   });
 
   const { data, isLoading, isError } = useQuery<TransitResponse>({
-    queryKey: ['transits', chartId, queryParams?.from, queryParams?.to],
+    queryKey: ['transits', chartId, queryParams.from, queryParams.to, basis],
     queryFn: () =>
       api
         .get<TransitResponse>(
-          `/birth-records/${chartId}/transits?from=${queryParams!.from}&to=${queryParams!.to}`,
+          `/birth-records/${chartId}/transits?from=${queryParams.from}&to=${queryParams.to}&basis=${basis}`,
         )
         .then(r => r.data),
-    enabled: !!queryParams,
   });
 
   const onSubmit = (values: FormValues) => {
@@ -368,8 +640,12 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
         }
       : null;
 
+  const houseInfoByHouse = data
+    ? new Map((data.houseInfo ?? []).map(h => [h.house, h]))
+    : null;
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
 
       <AiAnalysisModal
         isOpen={aiOpen}
@@ -380,47 +656,61 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
         onClose={() => setAiOpen(false)}
       />
 
-      {/* ── Date range form ── */}
-      <form onSubmit={handleSubmit(onSubmit)}
-        className="rounded-2xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-md">
-        <p className="mb-4 text-xs font-medium uppercase tracking-widest text-white/40">
-          Select Date Range
-        </p>
-        <div className="flex flex-wrap items-end gap-4">
-          {/* From */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-white/50">From</label>
-            <input
-              type="date"
-              {...register('from')}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/90
-                         focus:border-amber-400/60 focus:outline-none focus:ring-1 focus:ring-amber-400/40
-                         [color-scheme:dark]"
-            />
-            {errors.from && <p className="text-xs text-red-400">{errors.from.message}</p>}
-          </div>
+      {/* ── Astro summary strip ── */}
+      <AstroSummaryStrip chartId={chartId} />
 
-          {/* To */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-white/50">To</label>
-            <input
-              type="date"
-              {...register('to')}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/90
-                         focus:border-amber-400/60 focus:outline-none focus:ring-1 focus:ring-amber-400/40
-                         [color-scheme:dark]"
-            />
-            {errors.to && <p className="text-xs text-red-400">{errors.to.message}</p>}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900
-                       transition hover:bg-amber-300 disabled:opacity-50">
-            {isLoading ? 'Loading…' : 'Calculate'}
-          </button>
+      {/* ── Transit basis toggle ── */}
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-white/40">Transit Basis</span>
+        <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+          {(['lagna', 'moon'] as const).map(b => (
+            <button
+              key={b}
+              type="button"
+              onClick={() => setBasis(b)}
+              className={[
+                'rounded-md px-4 py-1.5 text-xs font-semibold transition',
+                basis === b
+                  ? 'bg-amber-400 text-slate-900 shadow-sm'
+                  : 'text-white/55 hover:text-white/90',
+              ].join(' ')}
+            >
+              {b === 'lagna' ? 'Lagna' : 'Moon'}
+            </button>
+          ))}
         </div>
+        <span className="text-[11px] text-white/30">
+          {basis === 'lagna' ? 'Houses counted from Ascendant' : 'Houses counted from Moon sign (Chandra Lagna)'}
+        </span>
+      </div>
+
+      {/* ── Compact date range form ── */}
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium uppercase tracking-wider text-white/40">From</label>
+          <input
+            type="date"
+            {...register('from')}
+            className="rounded-lg border border-white/15 bg-slate-900/60 px-3 py-2 text-sm text-white/90 transition focus:border-amber-400/60 focus:outline-none focus:ring-1 focus:ring-amber-400/30 [color-scheme:dark]"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium uppercase tracking-wider text-white/40">To</label>
+          <input
+            type="date"
+            {...register('to')}
+            className="rounded-lg border border-white/15 bg-slate-900/60 px-3 py-2 text-sm text-white/90 transition focus:border-amber-400/60 focus:outline-none focus:ring-1 focus:ring-amber-400/30 [color-scheme:dark]"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="self-end rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-[0_0_12px_rgba(251,191,36,0.2)] transition hover:bg-amber-300 disabled:opacity-50">
+          {isLoading ? '…' : 'Calculate'}
+        </button>
+        {(errors.from || errors.to) && (
+          <p className="w-full text-xs text-red-400">{errors.from?.message ?? errors.to?.message}</p>
+        )}
       </form>
 
       {/* ── Error ── */}
@@ -432,118 +722,56 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
 
       {/* ── Spinner ── */}
       {isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-400 border-t-transparent" />
+        <div className="flex flex-col items-center justify-center gap-4 py-20">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-400 border-t-transparent shadow-[0_0_20px_rgba(251,191,36,0.3)]" />
+          <p className="text-sm text-white/40">Calculating transits…</p>
         </div>
       )}
 
       {/* ── Results ── */}
       {data && !isLoading && (
         <>
-          {/* Analyze with AI + history */}
-          <div className="rounded-2xl border border-violet-400/15 bg-violet-500/5 px-5 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs font-medium uppercase tracking-widest text-violet-300/50">
-                AI Analysis
-              </p>
-              <button
-                type="button"
-                onClick={handleAiAnalysis}
-                className="flex items-center gap-2 rounded-xl border border-violet-400/40 bg-violet-500/15 px-5 py-2 text-sm font-semibold text-violet-300 transition hover:bg-violet-500/25 hover:border-violet-400/60 hover:text-violet-200 active:scale-95"
-              >
-                <span className="text-base">✦</span>
-                Analyze with AI
-              </button>
-            </div>
-
-            {/* Past analyses list */}
-            {analysesList && analysesList.length > 0 && (
-              <div className="mt-4 flex flex-col gap-1.5">
-                <p className="mb-1 text-[11px] uppercase tracking-widest text-white/25">Past Analyses</p>
-                {analysesList.map(item => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-2.5"
-                  >
-                    <div className="flex items-center gap-4 text-xs">
-                      <span className="tabular-nums text-white/50">
-                        {new Date(item.createdAt).toLocaleDateString('en-GB', {
-                          day: '2-digit', month: 'short', year: 'numeric',
-                        })}{' '}
-                        <span className="text-white/30">
-                          {new Date(item.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-white/40">
-                        {item.transitFrom} → {item.transitTo}
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 capitalize text-white/30">
-                        {item.basis}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleViewPast(item)}
-                      className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300 transition hover:bg-violet-500/20"
-                    >
-                      View
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Mahadasha */}
-          <MahadashaPanel chartId={chartId} />
-
-          {/* Sign change summary */}
-          <SignChangeSummary days={data.days} />
-
-          {/* Date slider */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-widest text-white/40">Date</p>
-              <span className="rounded-md bg-white/10 px-3 py-1 text-sm font-medium text-amber-300">
+          {/* Sticky date-slider + view toggle bar */}
+          <div className="sticky top-12 z-20 -mx-4 mb-2 rounded-none border-y border-white/10 bg-slate-950/90 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border">
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={data.days.length - 1}
+                value={dayIndex}
+                onChange={e => setDayIndex(Number(e.target.value))}
+                className="flex-1 accent-amber-400"
+              />
+              <span className="shrink-0 rounded-md bg-white/10 px-3 py-1 text-sm font-medium tabular-nums text-amber-300">
                 {selectedDay?.date}
               </span>
+              {/* View toggle */}
+              <div className="flex shrink-0 gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+                {(['chart', 'houses', 'table'] as const).map(v => (
+                  <button key={v} type="button" onClick={() => setView(v)}
+                    className={[
+                      'rounded-md px-3 py-1 text-xs font-medium transition',
+                      view === v ? 'bg-amber-400 text-slate-900 shadow-sm' : 'text-white/60 hover:text-white/90',
+                    ].join(' ')}>
+                    {v === 'chart' ? 'Chart' : v === 'houses' ? 'Houses' : 'Table'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={data.days.length - 1}
-              value={dayIndex}
-              onChange={e => setDayIndex(Number(e.target.value))}
-              className="w-full accent-amber-400"
-            />
-            <div className="mt-1 flex justify-between text-[11px] text-white/30">
+            <div className="mt-1 flex justify-between text-[10px] text-white/30">
               <span>{data.from}</span>
               <span>{data.to}</span>
             </div>
           </div>
 
-          {/* View toggle */}
-          <div className="flex gap-1 self-start rounded-lg border border-white/10 bg-white/5 p-1">
-            {(['chart', 'table'] as const).map(v => (
-              <button key={v} type="button" onClick={() => setView(v)}
-                className={[
-                  'px-4 py-1.5 rounded-md text-xs font-medium transition capitalize',
-                  view === v ? 'bg-amber-400 text-slate-900' : 'text-white/60 hover:text-white/90',
-                ].join(' ')}>
-                {v === 'chart' ? 'Transit Chart' : 'Compare Table'}
-              </button>
-            ))}
-          </div>
-
           {/* Chart view */}
           {view === 'chart' && transitChartShape && selectedDay && (
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-
               {/* Transit diamond chart */}
               <div className="flex flex-col gap-3 lg:w-[420px] lg:shrink-0">
-                <div className="w-full rounded-2xl border border-cyan-400/20 bg-white/5 p-4 shadow-xl backdrop-blur-md">
+                <div className="w-full rounded-2xl border border-cyan-400/20 bg-gradient-to-b from-white/[0.07] to-white/[0.03] p-4 shadow-xl backdrop-blur-md">
                   <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="text-xs font-medium uppercase tracking-widest text-cyan-400/60">
+                    <span className="border-l-2 border-cyan-400/50 pl-2 text-xs font-medium uppercase tracking-widest text-cyan-400/60">
                       Transit Chart
                     </span>
                     <span className="text-xs text-white/30">{selectedDay.date}</span>
@@ -551,38 +779,77 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
                   <DiamondChart chart={transitChartShape} />
                 </div>
                 <p className="text-center text-xs text-white/30">
-                  Houses from Moon sign (Chandra Lagna){' '}
+                  Houses from {basis === 'moon' ? 'Moon sign (Chandra Lagna)' : 'Ascendant (Lagna)'}{' '}
                   <span className="text-white/50">({data.natalLagna.sign})</span>
                 </p>
               </div>
 
-              {/* Quick planet sign list */}
-              <div className="flex-1 min-w-0 rounded-2xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-md">
-                <p className="mb-4 text-xs font-medium uppercase tracking-widest text-white/40">
-                  Transit Positions — {selectedDay.date}
-                </p>
+              {/* Transit positions */}
+              <div className="flex-1 min-w-0 rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] px-5 py-5 backdrop-blur-md">
+                <div className="mb-3">
+                  <p className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
+                    Transit Positions — {selectedDay.date}
+                  </p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-white/35">
+                    <span className="text-white/50">vs lord</span> is the natural (naisargika) relationship of the transiting planet to the sign lord.
+                  </p>
+                </div>
                 <div className="flex flex-col gap-2">
                   {selectedDay.planets.map(p => {
                     const dignityKey = p.dignity.includes('exalted')     ? 'exalted'
                       : p.dignity.includes('debilitated') ? 'debilitated'
                       : p.dignity.includes('own')         ? 'own'          : 'neutral';
+                    const hi = houseInfoByHouse?.get(p.house);
+                    const rel = hi?.planetRelationships?.[p.planet] ?? 'neutral';
+                    const lordSym = hi?.signLord ? (PLANET_SYMBOL[hi.signLord] ?? '') : '';
                     return (
-                      <div key={p.planet}
-                        className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.03] px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base text-white/70">{PLANET_SYMBOL[p.planet] ?? ''}</span>
-                          <span className="text-sm font-medium text-white/85">{p.planet}</span>
-                          {p.isRetrograde && (
-                            <span className="rounded bg-orange-400/20 px-1 py-0.5 text-[10px] text-orange-300">℞</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-sm">
-                          <span className="text-indigo-300">{p.sign}</span>
-                          <span className="tabular-nums text-white/40">{p.degreeInSign.toFixed(1)}°</span>
-                          <span className="text-white/35">H{p.house}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs capitalize ${DIGNITY_BADGE[dignityKey]}`}>
-                            {dignityKey}
-                          </span>
+                      <div
+                        key={p.planet}
+                        className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 transition-colors duration-150 hover:bg-white/[0.05] sm:px-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="text-xl text-white/70">{PLANET_SYMBOL[p.planet] ?? ''}</span>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                <span className="text-sm font-semibold text-white/90">{p.planet}</span>
+                                {p.isRetrograde && (
+                                  <span className="rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-[11px] text-white/40">
+                                House {p.house} <span className="text-white/25">·</span> from Moon
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm sm:justify-end">
+                            <div className="min-w-0">
+                              <p className="font-medium text-indigo-200">
+                                {p.sign}{' '}
+                                <span className="tabular-nums text-xs font-normal text-white/45">
+                                  {p.degreeInSign.toFixed(1)}°
+                                </span>
+                              </p>
+                              {hi?.signLord && (
+                                <p className="mt-0.5 text-[11px] text-cyan-300/85">
+                                  Lord {lordSym} {hi.signLord}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-1 sm:items-center sm:text-center" title={REL_TO_LORD_HINT[rel]}>
+                              <span className="text-[9px] uppercase tracking-wider text-white/30">vs lord</span>
+                              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize ${REL_BADGE[rel]}`}>
+                                {rel}
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-[9px] uppercase tracking-wider text-white/30">dignity</span>
+                              <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
+                                {dignityKey}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -600,6 +867,100 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
               houseInfo={data.houseInfo ?? []}
             />
           )}
+
+          {/* Houses view */}
+          {view === 'houses' && selectedDay && (
+            <HouseView
+              planets={selectedDay.planets}
+              houseInfo={data.houseInfo ?? []}
+              natalPlanets={data.natalPlanets}
+              date={selectedDay.date}
+            />
+          )}
+
+          {/* Sign changes — collapsible */}
+          <SignChangeSummary days={data.days} />
+
+          {/* Mahadasha — collapsible */}
+          <details className="rounded-2xl border border-white/10 bg-white/5">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4">
+              <span className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
+                Vimshottari Mahadasha
+              </span>
+              <span className="text-white/30 text-sm">▾</span>
+            </summary>
+            <div className="border-t border-white/8 px-5 pb-5 pt-4">
+              <MahadashaPanel chartId={chartId} />
+            </div>
+          </details>
+
+          {/* AI Analyses — collapsible */}
+          <details className="rounded-2xl border border-violet-400/15 bg-violet-500/5">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4">
+              <span className="flex items-center gap-2">
+                <span className="border-l-2 border-violet-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-violet-300/60">
+                  AI Analyses
+                </span>
+                {analysesList && analysesList.length > 0 && (
+                  <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] tabular-nums text-violet-300/70">
+                    {analysesList.length}
+                  </span>
+                )}
+              </span>
+              <span className="text-white/30 text-sm">▾</span>
+            </summary>
+            <div className="border-t border-violet-400/10 px-5 pb-5 pt-4">
+              <button
+                type="button"
+                onClick={handleAiAnalysis}
+                className="flex items-center gap-2 rounded-xl border border-violet-400/40 bg-violet-500/15 px-5 py-2 text-sm font-semibold text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.1)] transition hover:bg-violet-500/25 hover:border-violet-400/60 active:scale-95"
+              >
+                <span className="text-base">✦</span>
+                Analyze with AI
+              </button>
+
+              {analysesList && analysesList.length > 0 && (
+                <div className="mt-4 flex flex-col gap-1.5">
+                  <p className="mb-1 text-[11px] uppercase tracking-widest text-white/25">Past Analyses</p>
+                  {analysesList.map(item => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-2.5 transition-colors duration-150 hover:bg-white/[0.05]"
+                    >
+                      <div className="flex items-center gap-3 text-xs flex-wrap">
+                        <span className="tabular-nums text-white/50">
+                          {new Date(item.createdAt).toLocaleDateString('en-GB', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                          })}{' '}
+                          <span className="text-white/30">
+                            {new Date(item.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-white/40">
+                          {item.transitFrom} → {item.transitTo}
+                        </span>
+                        <span className={[
+                          'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                          item.basis === 'moon'
+                            ? 'border border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
+                            : 'border border-amber-400/30 bg-amber-400/10 text-amber-300',
+                        ].join(' ')}>
+                          {item.basis === 'moon' ? 'Moon basis' : 'Lagna basis'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleViewPast(item)}
+                        className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300 transition hover:bg-violet-500/20"
+                      >
+                        View
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
         </>
       )}
     </div>
