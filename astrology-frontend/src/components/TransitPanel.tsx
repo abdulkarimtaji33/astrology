@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -381,10 +381,80 @@ function SignChangeSummary({ days }: { days: TransitDayData[] }) {
   );
 }
 
+// ─── House transit history: date ranges helper (sorted unique dates) ───────
+function buildDateRangesList(dates: string[]): string[] {
+  if (dates.length === 0) return [];
+  const d = [...new Set(dates)].sort();
+  const ranges: string[] = [];
+  let rangeStart = d[0];
+  let prev = d[0];
+  for (let i = 1; i <= d.length; i++) {
+    const curr = d[i];
+    const prevDate = new Date(prev);
+    const currDate = curr ? new Date(curr) : null;
+    const isConsecutive = Boolean(
+      currDate && currDate.getTime() - prevDate.getTime() <= 86400000 * 1.5,
+    );
+    if (!isConsecutive) {
+      ranges.push(rangeStart === prev ? rangeStart : `${rangeStart} → ${prev}`);
+      if (curr) rangeStart = curr;
+    }
+    prev = curr ?? prev;
+  }
+  return ranges;
+}
+
 // ─── House transit history modal ───────────────────────────────────────────
 interface HouseHistoryEntry {
   planet: string;
   dates: string[];
+}
+
+function buildHouseHistoryCopy(
+  house: number,
+  hi: TransitHouseInfo | undefined,
+  allDays: TransitDayData[],
+  ignoreMoon: boolean,
+): string {
+  const from = allDays[0]?.date;
+  const to   = allDays[allDays.length - 1]?.date;
+  const rangeLine = from && to ? (from === to ? from : `${from} — ${to}`) : '—';
+
+  const countDaysWithRelevant = allDays.filter(d =>
+    d.planets.some(p => p.house === house && !(ignoreMoon && p.planet === 'Moon')),
+  ).length;
+
+  const map = new Map<string, string[]>();
+  for (const day of allDays) {
+    for (const p of day.planets) {
+      if (p.house !== house) continue;
+      if (ignoreMoon && p.planet === 'Moon') continue;
+      if (!map.has(p.planet)) map.set(p.planet, []);
+      map.get(p.planet)!.push(day.date);
+    }
+  }
+  const lines: string[] = [
+    `House ${house}` + (hi?.sign ? ` — ${hi.sign}` : ''),
+    hi?.mainTheme ? `Theme: ${hi.mainTheme}` : '',
+    `Selected range: ${rangeLine}`,
+    `Days with at least one relevant planet in this house: ${countDaysWithRelevant}${
+      ignoreMoon ? ' (Moon excluded)' : ''}`,
+    '',
+  ].filter(Boolean) as string[];
+
+  const names = Array.from(map.keys()).sort();
+  for (const planet of names) {
+    const dates = map.get(planet)!;
+    const ranges = buildDateRangesList(dates);
+    lines.push(`${PLANET_SYMBOL[planet] ? `${PLANET_SYMBOL[planet]} ` : ''}${planet} — ${dates.length} day${
+      dates.length !== 1 ? 's' : ''}`);
+    for (const r of ranges) lines.push(`  ${r}`);
+    lines.push('');
+  }
+  if (names.length === 0) {
+    lines.push(ignoreMoon ? 'No other planets in this house in the range (Moon only or empty).' : 'No planets in this house in the range.');
+  }
+  return lines.join('\n').replace(/\n+$/, '\n');
 }
 
 function HouseHistoryModal({
@@ -398,22 +468,39 @@ function HouseHistoryModal({
   allDays: TransitDayData[];
   onClose: () => void;
 }) {
-  // Group by planet: collect all dates that planet was in this house
-  const planetDatesMap = new Map<string, string[]>();
-  for (const day of allDays) {
-    for (const p of day.planets) {
-      if (p.house === house) {
+  const [ignoreMoon, setIgnoreMoon] = useState(false);
+  const [copyDone, setCopyDone]   = useState(false);
+
+  const { entries, totalTransits } = useMemo(() => {
+    const planetDatesMap = new Map<string, string[]>();
+    for (const day of allDays) {
+      for (const p of day.planets) {
+        if (p.house !== house) continue;
+        if (ignoreMoon && p.planet === 'Moon') continue;
         if (!planetDatesMap.has(p.planet)) planetDatesMap.set(p.planet, []);
         planetDatesMap.get(p.planet)!.push(day.date);
       }
     }
-  }
+    const ent: HouseHistoryEntry[] = Array.from(planetDatesMap.entries())
+      .map(([planet, dates]) => ({ planet, dates }))
+      .sort((a, b) => a.planet.localeCompare(b.planet));
 
-  const entries: HouseHistoryEntry[] = Array.from(planetDatesMap.entries())
-    .map(([planet, dates]) => ({ planet, dates }))
-    .sort((a, b) => a.planet.localeCompare(b.planet));
+    const total = allDays.filter(d =>
+      d.planets.some(p => p.house === house && !(ignoreMoon && p.planet === 'Moon')),
+    ).length;
+    return { entries: ent, totalTransits: total };
+  }, [allDays, house, ignoreMoon]);
 
-  const totalTransits = allDays.filter(d => d.planets.some(p => p.house === house)).length;
+  const copyToClipboard = async () => {
+    const text = buildHouseHistoryCopy(house, hi, allDays, ignoreMoon);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -423,47 +510,54 @@ function HouseHistoryModal({
         onClick={e => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-4 border-b border-white/8">
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
               <h3 className="text-sm font-semibold text-amber-300">
                 House {house} · {hi?.sign ?? ''}
               </h3>
               {hi?.mainTheme && <p className="text-xs text-white/40 mt-0.5">{hi.mainTheme}</p>}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-white/30 hover:text-white/60 text-lg leading-none transition-colors"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={copyToClipboard}
+                className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] text-white/70 hover:bg-white/10 transition-colors"
+              >
+                {copyDone ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-white/30 hover:text-white/60 text-lg leading-none transition-colors p-1"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <p className="mt-2 text-[11px] text-white/30">
-            {totalTransits} day{totalTransits !== 1 ? 's' : ''} with planets in this house across the selected range
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className="flex cursor-pointer select-none items-center gap-2 text-[11px] text-white/50">
+              <input
+                type="checkbox"
+                checked={ignoreMoon}
+                onChange={e => setIgnoreMoon(e.target.checked)}
+                className="rounded border-white/20 bg-white/5 text-amber-500 focus:ring-amber-500/40"
+              />
+              Ignore Moon (hide Moon rows and days where only Moon is in this house)
+            </label>
+            <p className="text-[11px] text-white/30">
+              {totalTransits} day{totalTransits !== 1 ? 's' : ''} with a planet{ignoreMoon ? ' (excl. Moon)' : ''} in
+              this house
+            </p>
+          </div>
         </div>
 
         <div className="overflow-y-auto max-h-[60vh] px-5 py-4 flex flex-col gap-4">
           {entries.length === 0 ? (
-            <p className="text-xs text-white/30">No planets transited this house in the selected range.</p>
+            <p className="text-xs text-white/30">No matching planets in this house for the selected range.</p>
           ) : (
             entries.map(({ planet, dates }) => {
-              // Collapse consecutive dates into ranges
-              const ranges: string[] = [];
-              let rangeStart = dates[0];
-              let prev = dates[0];
-              for (let i = 1; i <= dates.length; i++) {
-                const curr = dates[i];
-                const prevDate = new Date(prev);
-                const currDate = curr ? new Date(curr) : null;
-                const isConsecutive = currDate && (currDate.getTime() - prevDate.getTime()) <= 86400000 * 1.5;
-                if (!isConsecutive) {
-                  ranges.push(rangeStart === prev ? rangeStart : `${rangeStart} → ${prev}`);
-                  if (curr) rangeStart = curr;
-                }
-                prev = curr ?? prev;
-              }
-
+              const ranges = buildDateRangesList(dates);
               return (
                 <div key={planet}>
                   <div className="flex items-center gap-2 mb-1.5">
@@ -473,7 +567,10 @@ function HouseHistoryModal({
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {ranges.map((r, i) => (
-                      <span key={i} className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] text-white/60 tabular-nums">
+                      <span
+                        key={i}
+                        className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] text-white/60 tabular-nums"
+                      >
                         {r}
                       </span>
                     ))}
@@ -503,6 +600,7 @@ function HouseView({
   allDays: TransitDayData[];
 }) {
   const [hiddenHouses, setHiddenHouses] = useState<Set<number>>(new Set());
+  const [collapsedHouses, setCollapsedHouses] = useState<Set<number>>(new Set());
   const [selectedHouse, setSelectedHouse] = useState<number | null>(null);
 
   const natalMap   = new Map(natalPlanets.map(p => [p.planet, p]));
@@ -510,6 +608,14 @@ function HouseView({
 
   const toggleHouse = (h: number) => {
     setHiddenHouses(prev => {
+      const next = new Set(prev);
+      if (next.has(h)) next.delete(h); else next.add(h);
+      return next;
+    });
+  };
+
+  const toggleCollapsed = (h: number) => {
+    setCollapsedHouses(prev => {
       const next = new Set(prev);
       if (next.has(h)) next.delete(h); else next.add(h);
       return next;
@@ -542,17 +648,30 @@ function HouseView({
             <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
               Transit by House — {date}
             </h2>
-            <p className="mt-1 pl-5 text-[11px] text-white/30">Click a house number to see full transit history · toggle eye to hide/show</p>
+            <p className="mt-1 pl-5 text-[11px] text-white/30">
+              Click a row to open transit history · use arrow to expand/collapse · eye hides the row
+            </p>
           </div>
-          {hiddenHouses.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setHiddenHouses(new Set())}
-              className="shrink-0 text-[11px] text-amber-300/60 hover:text-amber-300 transition-colors"
-            >
-              Show all
-            </button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {collapsedHouses.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setCollapsedHouses(new Set())}
+                className="text-[11px] text-amber-300/60 hover:text-amber-300 transition-colors"
+              >
+                Expand all
+              </button>
+            )}
+            {hiddenHouses.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setHiddenHouses(new Set())}
+                className="text-[11px] text-amber-300/60 hover:text-amber-300 transition-colors"
+              >
+                Show all
+              </button>
+            )}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -572,30 +691,48 @@ function HouseView({
               {allHouses.map(({ house, hi, transiting }) => {
                 const isHidden = hiddenHouses.has(house);
                 const isEmpty = transiting.length === 0;
-                // Count days in range that had any planet in this house
+                const isCollapsed = !isHidden && collapsedHouses.has(house);
                 const transitDayCount = allDays.filter(d => d.planets.some(p => p.house === house)).length;
 
-                const houseCell = (rowSpan: number) => (
+                const rowClass =
+                  'border-b border-white/5 transition-colors duration-150 cursor-pointer hover:bg-white/[0.05]';
+                const openModal = () => setSelectedHouse(house);
+                const stop = (e: React.MouseEvent) => { e.stopPropagation(); };
+
+                const houseCol = (rowSpan: number, mode: 'hidden' | 'expanded') => (
                   <td rowSpan={rowSpan} className="px-4 py-3 align-middle border-r border-white/8">
                     <div className="flex flex-col items-center gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedHouse(house)}
-                        className={`text-xl font-bold tabular-nums leading-none transition-colors ${isEmpty ? 'text-white/70 hover:text-white' : 'text-amber-300 hover:text-amber-200'}`}
-                        title="Click to view transit history for this house"
-                      >
-                        {house}
-                      </button>
+                      <div className="flex items-center justify-center gap-0.5">
+                        {mode === 'expanded' && (
+                          <button
+                            type="button"
+                            onClick={e => { stop(e); toggleCollapsed(house); }}
+                            className="shrink-0 w-5 h-5 flex items-center justify-center text-[9px] text-amber-300/70 hover:text-amber-200"
+                            title="Collapse to one row"
+                            aria-label="Collapse house row"
+                          >
+                            ▼
+                          </button>
+                        )}
+                        <span
+                          className={
+                            (isEmpty ? 'text-white/80' : 'text-amber-200') + ' text-xl font-bold tabular-nums leading-none'
+                          }
+                        >
+                          {house}
+                        </span>
+                      </div>
                       {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
                       {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
                       {transitDayCount > 0 && (
-                        <span className="text-[9px] text-white/25 tabular-nums">{transitDayCount}d</span>
+                        <span className="text-[9px] text-white/25 tabular-nums">{transitDayCount}d in range</span>
                       )}
                       <button
                         type="button"
-                        onClick={() => toggleHouse(house)}
-                        className="mt-1 text-[11px] text-white/25 hover:text-white/60 transition-colors"
+                        onClick={e => { stop(e); toggleHouse(house); }}
+                        className="mt-0.5 text-[11px] text-white/25 hover:text-white/60 transition-colors"
                         title={isHidden ? 'Show house' : 'Hide house'}
+                        aria-label={isHidden ? 'Show house' : 'Hide house'}
                       >
                         {isHidden ? '👁' : '🙈'}
                       </button>
@@ -605,17 +742,74 @@ function HouseView({
 
                 if (isHidden) {
                   return (
-                    <tr key={`h-${house}-hidden`} className="border-b border-white/5 opacity-40">
-                      {houseCell(1)}
-                      <td colSpan={7} className="px-3 py-2 text-xs text-white/20 italic">hidden</td>
+                    <tr
+                      key={`h-${house}-hidden`}
+                      className="border-b border-white/5 opacity-40"
+                      onClick={openModal}
+                    >
+                      {houseCol(1, 'hidden')}
+                      <td colSpan={7} className="px-3 py-2 text-xs text-white/20 italic">hidden (click to open transits)</td>
+                    </tr>
+                  );
+                }
+
+                if (isCollapsed) {
+                  const summary = isEmpty
+                    ? 'No planets in this house on the selected day'
+                    : transiting.map(t => t.planet).join(' · ');
+                  return (
+                    <tr
+                      key={`h-${house}-c`}
+                      className={rowClass}
+                      onClick={openModal}
+                    >
+                      <td className="px-4 py-2.5 align-middle border-r border-white/8 w-[72px]">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <div className="flex items-center justify-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={e => { stop(e); toggleCollapsed(house); }}
+                              className="shrink-0 w-5 h-5 flex items-center justify-center text-[9px] text-amber-300/70 hover:text-amber-200"
+                              title="Expand row"
+                              aria-label="Expand house row"
+                            >
+                              ▶
+                            </button>
+                            <span className="text-lg font-bold tabular-nums text-amber-200">{house}</span>
+                          </div>
+                          {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
+                          {transitDayCount > 0 && (
+                            <span className="text-[9px] text-white/25 tabular-nums">{transitDayCount}d in range</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={e => { stop(e); toggleHouse(house); }}
+                            className="text-[11px] text-white/25 hover:text-white/60"
+                            title="Hide house"
+                            aria-label="Hide house"
+                          >
+                            🙈
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 border-r border-white/8 max-w-[200px] align-middle">
+                        <p className="text-xs font-medium text-amber-300/70 line-clamp-1">{hi?.mainTheme ?? '—'}</p>
+                      </td>
+                      <td colSpan={6} className="px-3 py-2.5 text-xs text-white/45">
+                        {summary}
+                      </td>
                     </tr>
                   );
                 }
 
                 if (isEmpty) {
                   return (
-                    <tr key={`h-${house}`} className="border-b border-white/5">
-                      {houseCell(1)}
+                    <tr
+                      key={`h-${house}`}
+                      className={rowClass}
+                      onClick={openModal}
+                    >
+                      {houseCol(1, 'expanded')}
                       <td className="px-3 py-3 border-r border-white/8">
                         <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
                         <p className="mt-0.5 text-[10px] text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
@@ -634,12 +828,14 @@ function HouseView({
                   const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
 
                   return (
-                    <tr key={`${house}-${tp.planet}`}
-                      className="border-b border-white/5 transition-colors duration-150 hover:bg-white/[0.05]">
+                    <tr
+                      key={`${house}-${tp.planet}`}
+                      className={rowClass}
+                      onClick={openModal}
+                    >
 
-                      {pi === 0 && houseCell(transiting.length)}
+                      {pi === 0 && houseCol(transiting.length, 'expanded')}
 
-                      {/* Theme — merged */}
                       {pi === 0 && (
                         <td rowSpan={transiting.length} className="px-3 py-3 align-middle border-r border-white/8 max-w-[180px]">
                           <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
@@ -647,7 +843,6 @@ function HouseView({
                         </td>
                       )}
 
-                      {/* Planet */}
                       <td className="px-4 py-3 font-medium text-white/90">
                         <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
                         {tp.planet}
@@ -656,7 +851,6 @@ function HouseView({
                         )}
                       </td>
 
-                      {/* Transit sign · lord */}
                       <td className="px-3 py-3">
                         <div className="flex flex-col gap-0.5">
                           <span>
@@ -667,7 +861,6 @@ function HouseView({
                         </div>
                       </td>
 
-                      {/* vs sign lord */}
                       <td className="px-3 py-3">
                         <span
                           className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
@@ -680,19 +873,16 @@ function HouseView({
                         )}
                       </td>
 
-                      {/* Natal sign */}
                       <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
                         {natal
                           ? <span>{natal.sign} <span className="text-xs text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
                           : '—'}
                       </td>
 
-                      {/* Natal house */}
                       <td className="px-3 py-3 tabular-nums text-white/40">
                         {natal ? `H${natal.house}` : '—'}
                       </td>
 
-                      {/* Dignity */}
                       <td className="px-3 py-3">
                         <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
                           {dignityKey}
