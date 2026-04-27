@@ -445,7 +445,7 @@ function ReminderModal({
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative z-10 w-full max-w-md rounded-2xl border border-indigo-400/20 bg-[#0d0d1c] shadow-2xl overflow-hidden"
+        className="relative z-10 w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl border border-indigo-400/20 bg-[#0d0d1c] shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -471,7 +471,7 @@ function ReminderModal({
         </div>
 
         {status === 'success' ? (
-          <div className="px-5 py-8 text-center flex flex-col items-center gap-3">
+          <div className="overflow-y-auto flex-1 px-5 py-8 text-center flex flex-col items-center gap-3">
             <span className="text-3xl">✅</span>
             <p className="text-sm text-white/80 font-medium">Reminder scheduled!</p>
             <p className="text-[11px] text-white/40">
@@ -487,7 +487,7 @@ function ReminderModal({
             </button>
           </div>
         ) : (
-          <form onSubmit={submit} className="px-5 py-4 flex flex-col gap-4">
+          <form onSubmit={submit} className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4">
             {/* Placement preview */}
             <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-widest text-white/25 mb-1">Placement details (auto-filled)</p>
@@ -779,7 +779,7 @@ function HouseHistoryModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative z-10 w-full max-w-lg rounded-2xl border border-white/[0.12] bg-[#0f0f1a] shadow-2xl overflow-hidden"
+        className="relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border border-white/[0.12] bg-[#0f0f1a] shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-4 border-b border-white/8">
@@ -825,7 +825,7 @@ function HouseHistoryModal({
           </div>
         </div>
 
-        <div className="overflow-y-auto max-h-[60vh] px-5 py-4 flex flex-col gap-4">
+        <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4">
           {entries.length === 0 ? (
             <p className="text-xs text-white/30">No matching planets in this house for the selected range.</p>
           ) : (
