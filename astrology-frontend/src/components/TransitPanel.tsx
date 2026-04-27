@@ -381,7 +381,233 @@ function SignChangeSummary({ days }: { days: TransitDayData[] }) {
   );
 }
 
+// ─── Transit reminder scheduling modal ─────────────────────────────────────
+interface ReminderPayload {
+  planet: string;
+  houseNum: number;
+  houseSign?: string;
+  houseTheme?: string;
+  dateRange: string; // display range string e.g. "1 Jan 2026 → 15 Jan 2026"
+  /** ISO first date of range, used as initial sendDate */
+  firstIsoDate: string;
+}
+
+function ReminderModal({
+  payload,
+  onClose,
+}: {
+  payload: ReminderPayload;
+  onClose: () => void;
+}) {
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [sendDate, setSendDate] = useState(payload.firstIsoDate);
+  const [subject, setSubject] = useState(
+    `Transit reminder: ${payload.planet} in House ${payload.houseNum}${payload.houseSign ? ` (${payload.houseSign})` : ''}`,
+  );
+  const [note, setNote] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const placementDetails = [
+    `Planet: ${payload.planet}`,
+    `House: ${payload.houseNum}${payload.houseSign ? ` — ${payload.houseSign}` : ''}`,
+    payload.houseTheme ? `Theme: ${payload.houseTheme}` : '',
+    `Transit dates: ${payload.dateRange}`,
+  ].filter(Boolean).join('\n');
+
+  const offsetDate = (days: number) => {
+    const d = new Date(`${payload.firstIsoDate}T12:00:00`);
+    d.setDate(d.getDate() - days);
+    setSendDate(d.toISOString().slice(0, 10));
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipientEmail || !sendDate || !subject) return;
+    setStatus('loading');
+    try {
+      await api.post('/reminders', {
+        recipientEmail,
+        sendDate,
+        subject,
+        placementDetails,
+        note: note || undefined,
+      });
+      setStatus('success');
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="relative z-10 w-full max-w-md rounded-2xl border border-indigo-400/20 bg-[#0d0d1c] shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 border-b border-white/8">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-indigo-300">
+                Schedule Reminder Email
+              </h3>
+              <p className="text-[11px] text-white/40 mt-0.5">
+                {PLANET_SYMBOL[payload.planet] ?? ''} {payload.planet} · House {payload.houseNum}
+                {payload.houseSign ? ` · ${payload.houseSign}` : ''}
+              </p>
+              <p className="text-[11px] text-indigo-300/60 mt-1 tabular-nums">{payload.dateRange}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-white/30 hover:text-white/60 text-lg leading-none p-1"
+              aria-label="Close"
+            >✕</button>
+          </div>
+        </div>
+
+        {status === 'success' ? (
+          <div className="px-5 py-8 text-center flex flex-col items-center gap-3">
+            <span className="text-3xl">✅</span>
+            <p className="text-sm text-white/80 font-medium">Reminder scheduled!</p>
+            <p className="text-[11px] text-white/40">
+              An email will be sent to <span className="text-white/60">{recipientEmail}</span> on{' '}
+              <span className="text-indigo-300">{formatTransitModalDate(sendDate)}</span>.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-5 py-2 text-xs text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="px-5 py-4 flex flex-col gap-4">
+            {/* Placement preview */}
+            <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-widest text-white/25 mb-1">Placement details (auto-filled)</p>
+              <pre className="text-[11px] text-white/50 whitespace-pre-wrap leading-relaxed font-sans">{placementDetails}</pre>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-[11px] text-white/40 mb-1.5">Recipient email</label>
+              <input
+                type="email"
+                required
+                value={recipientEmail}
+                onChange={e => setRecipientEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-indigo-400/50 focus:outline-none"
+              />
+            </div>
+
+            {/* Send date + shortcuts */}
+            <div>
+              <label className="block text-[11px] text-white/40 mb-1.5">Send on date</label>
+              <input
+                type="date"
+                required
+                value={sendDate}
+                onChange={e => setSendDate(e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white/90 focus:border-indigo-400/50 focus:outline-none"
+              />
+              <div className="flex gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setSendDate(payload.firstIsoDate)}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-white/50 hover:bg-white/[0.07] hover:text-white/70 transition-colors"
+                >
+                  On start date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => offsetDate(7)}
+                  className="rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-[11px] text-amber-300/70 hover:bg-amber-400/10 transition-colors"
+                >
+                  −7 days early
+                </button>
+                <button
+                  type="button"
+                  onClick={() => offsetDate(15)}
+                  className="rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-[11px] text-amber-300/70 hover:bg-amber-400/10 transition-colors"
+                >
+                  −15 days early
+                </button>
+              </div>
+              {sendDate && (
+                <p className="text-[11px] text-indigo-300/60 mt-1.5">
+                  Will send: {formatTransitModalDate(sendDate)}
+                </p>
+              )}
+            </div>
+
+            {/* Subject */}
+            <div>
+              <label className="block text-[11px] text-white/40 mb-1.5">Subject</label>
+              <input
+                type="text"
+                required
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-indigo-400/50 focus:outline-none"
+              />
+            </div>
+
+            {/* Note */}
+            <div>
+              <label className="block text-[11px] text-white/40 mb-1.5">
+                Extra note <span className="text-white/20">(optional)</span>
+              </label>
+              <textarea
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                rows={3}
+                placeholder="Add any personal notes or instructions..."
+                className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:border-indigo-400/50 focus:outline-none resize-none"
+              />
+            </div>
+
+            {status === 'error' && (
+              <p className="text-[11px] text-red-400/80">Failed to schedule reminder. Please try again.</p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={status === 'loading'}
+                className="flex-1 rounded-xl border border-indigo-400/40 bg-indigo-500/15 py-2.5 text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 transition-colors disabled:opacity-50"
+              >
+                {status === 'loading' ? 'Scheduling…' : 'Schedule Reminder'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-white/40 hover:bg-white/[0.07] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── House transit history: date ranges helper (sorted unique dates) ───────
+/** e.g. "2026-01-01" → "1 Jan 2026" (avoids TZ shift with noon UTC) */
+function formatTransitModalDate(iso: string): string {
+  const d = new Date(iso.includes('T') ? iso : `${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function buildDateRangesList(dates: string[]): string[] {
   if (dates.length === 0) return [];
   const d = [...new Set(dates)].sort();
@@ -396,7 +622,11 @@ function buildDateRangesList(dates: string[]): string[] {
       currDate && currDate.getTime() - prevDate.getTime() <= 86400000 * 1.5,
     );
     if (!isConsecutive) {
-      ranges.push(rangeStart === prev ? rangeStart : `${rangeStart} → ${prev}`);
+      const one =
+        rangeStart === prev
+          ? formatTransitModalDate(rangeStart)
+          : `${formatTransitModalDate(rangeStart)} → ${formatTransitModalDate(prev)}`;
+      ranges.push(one);
       if (curr) rangeStart = curr;
     }
     prev = curr ?? prev;
@@ -418,7 +648,10 @@ function buildHouseHistoryCopy(
 ): string {
   const from = allDays[0]?.date;
   const to   = allDays[allDays.length - 1]?.date;
-  const rangeLine = from && to ? (from === to ? from : `${from} — ${to}`) : '—';
+  const rangeLine =
+    from && to
+      ? (from === to ? formatTransitModalDate(from) : `${formatTransitModalDate(from)} — ${formatTransitModalDate(to)}`)
+      : '—';
 
   const countDaysWithRelevant = allDays.filter(d =>
     d.planets.some(p => p.house === house && !(ignoreMoon && p.planet === 'Moon')),
@@ -493,6 +726,7 @@ function HouseHistoryModal({
 }) {
   const [ignoreMoon, setIgnoreMoon] = useState(false);
   const [copyDone, setCopyDone]   = useState(false);
+  const [reminderPayload, setReminderPayload] = useState<ReminderPayload | null>(null);
 
   const { entries, totalTransits } = useMemo(() => {
     const planetDatesMap = new Map<string, string[]>();
@@ -535,6 +769,13 @@ function HouseHistoryModal({
   };
 
   return (
+    <>
+    {reminderPayload && (
+      <ReminderModal
+        payload={reminderPayload}
+        onClose={() => setReminderPayload(null)}
+      />
+    )}
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
@@ -589,7 +830,26 @@ function HouseHistoryModal({
             <p className="text-xs text-white/30">No matching planets in this house for the selected range.</p>
           ) : (
             entries.map(({ planet, dates }) => {
+              const sortedUnique = [...new Set(dates)].sort();
               const ranges = buildDateRangesList(dates);
+              // Build per-range first ISO date for reminder scheduling
+              const rangeFirstIso: string[] = [];
+              {
+                let ri = 0;
+                for (let i = 0; i < sortedUnique.length; ) {
+                  const start = sortedUnique[i];
+                  rangeFirstIso[ri] = start;
+                  // Skip consecutive dates in this range
+                  let j = i + 1;
+                  while (
+                    j < sortedUnique.length &&
+                    new Date(sortedUnique[j]).getTime() - new Date(sortedUnique[j - 1]).getTime() <= 86400000 * 1.5
+                  ) j++;
+                  i = j;
+                  ri++;
+                }
+              }
+
               return (
                 <div key={planet}>
                   <div className="flex items-center gap-2 mb-1.5">
@@ -599,12 +859,26 @@ function HouseHistoryModal({
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {ranges.map((r, i) => (
-                      <span
+                      <button
                         key={i}
-                        className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] text-white/60 tabular-nums"
+                        type="button"
+                        title="Click to schedule a reminder email for this transit"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setReminderPayload({
+                            planet,
+                            houseNum: house,
+                            houseSign: hi?.sign,
+                            houseTheme: hi?.mainTheme,
+                            dateRange: r,
+                            firstIsoDate: rangeFirstIso[i] ?? sortedUnique[0],
+                          });
+                        }}
+                        className="group flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-[11px] text-white/60 tabular-nums hover:border-indigo-400/40 hover:bg-indigo-500/10 hover:text-indigo-300 transition-all duration-150"
                       >
                         {r}
-                      </span>
+                        <span className="opacity-0 group-hover:opacity-60 text-[10px] transition-opacity">🔔</span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -614,6 +888,7 @@ function HouseHistoryModal({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

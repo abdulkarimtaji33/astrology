@@ -1,4 +1,5 @@
 import { BirthRecord } from './birth-records/birth-record.entity';
+import { TransitReminder } from './reminders/transit-reminder.entity';
 import { AiAnalysis } from './birth-records/ai-analysis.entity';
 import { City } from './cities/city.entity';
 import { House } from './entities/house.entity';
@@ -15,6 +16,7 @@ import { State } from './entities/state.entity';
 
 export const ORM_ENTITIES = [
   BirthRecord,
+  TransitReminder,
   AiAnalysis,
   City,
   House,

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { BirthRecordsModule } from './birth-records/birth-records.module';
@@ -8,10 +9,12 @@ import { CitiesModule } from './cities/cities.module';
 import { WorldEventsModule } from './world-events/world-events.module';
 import { ORM_ENTITIES } from './orm-entities';
 import { AdminModule } from './admin/admin.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: process.env.DB_HOST || 'localhost',
@@ -31,6 +34,7 @@ import { AdminModule } from './admin/admin.module';
     CitiesModule,
     WorldEventsModule,
     AdminModule,
+    RemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

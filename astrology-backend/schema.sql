@@ -1,6 +1,20 @@
 -- astrology schema (no data)
 -- Generated 2026-03-16T08:25:38.594Z
 
+CREATE TABLE IF NOT EXISTS `transit_reminders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `recipientEmail` varchar(255) NOT NULL,
+  `sendDate` date NOT NULL,
+  `subject` varchar(500) NOT NULL,
+  `placementDetails` text NOT NULL,
+  `note` text DEFAULT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'pending',
+  `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_status_sendDate` (`status`, `sendDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `birth_records` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
