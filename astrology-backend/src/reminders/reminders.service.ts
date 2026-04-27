@@ -15,12 +15,17 @@ export class RemindersService {
     @InjectRepository(TransitReminder)
     private readonly repo: Repository<TransitReminder>,
   ) {
-    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env;
     if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+      const port = parseInt(SMTP_PORT ?? '587', 10);
+      const secureExplicit = SMTP_SECURE === '1' || SMTP_SECURE === 'true';
+      const insecureExplicit = SMTP_SECURE === '0' || SMTP_SECURE === 'false';
+      const secure = insecureExplicit ? false : secureExplicit || port === 465;
       this.transporter = nodemailer.createTransport({
         host: SMTP_HOST,
-        port: parseInt(SMTP_PORT ?? '587', 10),
-        secure: parseInt(SMTP_PORT ?? '587', 10) === 465,
+        port,
+        secure,
+        requireTLS: !secure && port === 587,
         auth: { user: SMTP_USER, pass: SMTP_PASS },
       });
     } else {
@@ -78,7 +83,7 @@ export class RemindersService {
 
     try {
       await this.transporter.sendMail({
-        from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+        from: process.env.EMAIL_FROM ?? process.env.SMTP_FROM ?? process.env.SMTP_USER,
         to: reminder.recipientEmail,
         subject: reminder.subject,
         text: body,
