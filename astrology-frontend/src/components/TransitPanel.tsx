@@ -457,6 +457,29 @@ function buildHouseHistoryCopy(
   return lines.join('\n').replace(/\n+$/, '\n');
 }
 
+/** Clipboard API is missing or throws on many HTTP / embedded contexts; execCommand works for user-initiated copy. */
+function tryCopyTextViaExecCommand(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', 'readonly');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
+}
+
 function HouseHistoryModal({
   house,
   hi,
@@ -491,14 +514,23 @@ function HouseHistoryModal({
     return { entries: ent, totalTransits: total };
   }, [allDays, house, ignoreMoon]);
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
     const text = buildHouseHistoryCopy(house, hi, allDays, ignoreMoon);
-    try {
-      await navigator.clipboard.writeText(text);
+    if (tryCopyTextViaExecCommand(text)) {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 2000);
-    } catch {
-      // ignore
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text).then(
+        () => {
+          setCopyDone(true);
+          setTimeout(() => setCopyDone(false), 2000);
+        },
+        () => { /* */ },
+      );
     }
   };
 
