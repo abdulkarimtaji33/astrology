@@ -940,7 +940,7 @@ interface Props {
 
 export default function TransitPanel({ chartId, natalLagna }: Props) {
   const [queryParams, setQueryParams] = useState<{ from: string; to: string }>({ from: today, to: in30Days });
-  const [basis, setBasis]             = useState<'lagna' | 'moon'>('lagna');
+  const [basis, setBasis]             = useState<'lagna' | 'moon'>('moon');
   const [dayIndex, setDayIndex]       = useState(0);
   const [view, setView]               = useState<'chart' | 'table' | 'houses'>('chart');
 
