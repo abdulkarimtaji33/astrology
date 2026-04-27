@@ -381,20 +381,140 @@ function SignChangeSummary({ days }: { days: TransitDayData[] }) {
   );
 }
 
+// ─── House transit history modal ───────────────────────────────────────────
+interface HouseHistoryEntry {
+  planet: string;
+  dates: string[];
+}
+
+function HouseHistoryModal({
+  house,
+  hi,
+  allDays,
+  onClose,
+}: {
+  house: number;
+  hi: TransitHouseInfo | undefined;
+  allDays: TransitDayData[];
+  onClose: () => void;
+}) {
+  // Group by planet: collect all dates that planet was in this house
+  const planetDatesMap = new Map<string, string[]>();
+  for (const day of allDays) {
+    for (const p of day.planets) {
+      if (p.house === house) {
+        if (!planetDatesMap.has(p.planet)) planetDatesMap.set(p.planet, []);
+        planetDatesMap.get(p.planet)!.push(day.date);
+      }
+    }
+  }
+
+  const entries: HouseHistoryEntry[] = Array.from(planetDatesMap.entries())
+    .map(([planet, dates]) => ({ planet, dates }))
+    .sort((a, b) => a.planet.localeCompare(b.planet));
+
+  const totalTransits = allDays.filter(d => d.planets.some(p => p.house === house)).length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative z-10 w-full max-w-lg rounded-2xl border border-white/[0.12] bg-[#0f0f1a] shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-4 border-b border-white/8">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-300">
+                House {house} · {hi?.sign ?? ''}
+              </h3>
+              {hi?.mainTheme && <p className="text-xs text-white/40 mt-0.5">{hi.mainTheme}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-white/30 hover:text-white/60 text-lg leading-none transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-white/30">
+            {totalTransits} day{totalTransits !== 1 ? 's' : ''} with planets in this house across the selected range
+          </p>
+        </div>
+
+        <div className="overflow-y-auto max-h-[60vh] px-5 py-4 flex flex-col gap-4">
+          {entries.length === 0 ? (
+            <p className="text-xs text-white/30">No planets transited this house in the selected range.</p>
+          ) : (
+            entries.map(({ planet, dates }) => {
+              // Collapse consecutive dates into ranges
+              const ranges: string[] = [];
+              let rangeStart = dates[0];
+              let prev = dates[0];
+              for (let i = 1; i <= dates.length; i++) {
+                const curr = dates[i];
+                const prevDate = new Date(prev);
+                const currDate = curr ? new Date(curr) : null;
+                const isConsecutive = currDate && (currDate.getTime() - prevDate.getTime()) <= 86400000 * 1.5;
+                if (!isConsecutive) {
+                  ranges.push(rangeStart === prev ? rangeStart : `${rangeStart} → ${prev}`);
+                  if (curr) rangeStart = curr;
+                }
+                prev = curr ?? prev;
+              }
+
+              return (
+                <div key={planet}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-base">{PLANET_SYMBOL[planet] ?? ''}</span>
+                    <span className="text-xs font-medium text-white/80">{planet}</span>
+                    <span className="text-[10px] text-white/30 ml-auto">{dates.length} day{dates.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ranges.map((r, i) => (
+                      <span key={i} className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] text-white/60 tabular-nums">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── House view ────────────────────────────────────────────────────────────
 function HouseView({
   planets,
   houseInfo,
   natalPlanets,
   date,
+  allDays,
 }: {
   planets: TransitPlanet[];
   houseInfo: TransitHouseInfo[];
   natalPlanets: TransitPlanet[];
   date: string;
+  allDays: TransitDayData[];
 }) {
+  const [hiddenHouses, setHiddenHouses] = useState<Set<number>>(new Set());
+  const [selectedHouse, setSelectedHouse] = useState<number | null>(null);
+
   const natalMap   = new Map(natalPlanets.map(p => [p.planet, p]));
   const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
+
+  const toggleHouse = (h: number) => {
+    setHiddenHouses(prev => {
+      const next = new Set(prev);
+      if (next.has(h)) next.delete(h); else next.add(h);
+      return next;
+    });
+  };
 
   // Build all 12 houses; within each, sort planets by name
   const allHouses = Array.from({ length: 12 }, (_, i) => i + 1).map(h => ({
@@ -403,141 +523,190 @@ function HouseView({
     transiting: planets.filter(p => p.house === h).sort((a, b) => a.planet.localeCompare(b.planet)),
   }));
 
+  const selectedHouseInfo = selectedHouse !== null ? houseByNum.get(selectedHouse) : undefined;
+
   return (
-    <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
-      <div className="px-5 pt-5 pb-3">
-        <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
-          Transit by House — {date}
-        </h2>
-        <p className="mt-1 pl-5 text-[11px] text-white/30">Houses from Moon sign (Chandra Lagna) · all 12 houses in order</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/30">
-              <th className="px-4 py-2.5">House</th>
-              <th className="px-3 py-2.5 min-w-[140px]">Theme</th>
-              <th className="px-3 py-2.5">Planet</th>
-              <th className="px-3 py-2.5 max-w-[150px]">Transit Sign · Lord</th>
-              <th className="px-3 py-2.5 max-w-[120px]">vs Sign Lord</th>
-              <th className="px-3 py-2.5">Natal Sign</th>
-              <th className="px-3 py-2.5">Natal House</th>
-              <th className="px-3 py-2.5">Dignity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allHouses.map(({ house, hi, transiting }) => {
-              const isEmpty = transiting.length === 0;
+    <>
+      {selectedHouse !== null && (
+        <HouseHistoryModal
+          house={selectedHouse}
+          hi={selectedHouseInfo}
+          allDays={allDays}
+          onClose={() => setSelectedHouse(null)}
+        />
+      )}
 
-              if (isEmpty) {
-                return (
-                  <tr key={`h-${house}`} className="border-b border-white/5">
-                    <td className="px-4 py-3 border-r border-white/8">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-xl font-bold tabular-nums leading-none text-white/70">{house}</span>
-                        {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
-                        {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 border-r border-white/8">
-                      <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
-                      <p className="mt-0.5 text-[10px] text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
-                    </td>
-                    <td colSpan={6} className="px-3 py-3 text-xs text-white/30">—</td>
-                  </tr>
+      <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
+        <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-white/40">
+              Transit by House — {date}
+            </h2>
+            <p className="mt-1 pl-5 text-[11px] text-white/30">Click a house number to see full transit history · toggle eye to hide/show</p>
+          </div>
+          {hiddenHouses.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setHiddenHouses(new Set())}
+              className="shrink-0 text-[11px] text-amber-300/60 hover:text-amber-300 transition-colors"
+            >
+              Show all
+            </button>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wider text-white/30">
+                <th className="px-4 py-2.5">House</th>
+                <th className="px-3 py-2.5 min-w-[140px]">Theme</th>
+                <th className="px-3 py-2.5">Planet</th>
+                <th className="px-3 py-2.5 max-w-[150px]">Transit Sign · Lord</th>
+                <th className="px-3 py-2.5 max-w-[120px]">vs Sign Lord</th>
+                <th className="px-3 py-2.5">Natal Sign</th>
+                <th className="px-3 py-2.5">Natal House</th>
+                <th className="px-3 py-2.5">Dignity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allHouses.map(({ house, hi, transiting }) => {
+                const isHidden = hiddenHouses.has(house);
+                const isEmpty = transiting.length === 0;
+                // Count days in range that had any planet in this house
+                const transitDayCount = allDays.filter(d => d.planets.some(p => p.house === house)).length;
+
+                const houseCell = (rowSpan: number) => (
+                  <td rowSpan={rowSpan} className="px-4 py-3 align-middle border-r border-white/8">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedHouse(house)}
+                        className={`text-xl font-bold tabular-nums leading-none transition-colors ${isEmpty ? 'text-white/70 hover:text-white' : 'text-amber-300 hover:text-amber-200'}`}
+                        title="Click to view transit history for this house"
+                      >
+                        {house}
+                      </button>
+                      {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
+                      {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
+                      {transitDayCount > 0 && (
+                        <span className="text-[9px] text-white/25 tabular-nums">{transitDayCount}d</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleHouse(house)}
+                        className="mt-1 text-[11px] text-white/25 hover:text-white/60 transition-colors"
+                        title={isHidden ? 'Show house' : 'Hide house'}
+                      >
+                        {isHidden ? '👁' : '🙈'}
+                      </button>
+                    </div>
+                  </td>
                 );
-              }
 
-              return transiting.map((tp, pi) => {
-                const natal       = natalMap.get(tp.planet);
-                const signChanged = natal && tp.sign !== natal.sign;
-                const dignityKey  = tp.dignity.includes('exalted')     ? 'exalted'
-                  : tp.dignity.includes('debilitated') ? 'debilitated'
-                  : tp.dignity.includes('own')         ? 'own'          : 'neutral';
-                const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
+                if (isHidden) {
+                  return (
+                    <tr key={`h-${house}-hidden`} className="border-b border-white/5 opacity-40">
+                      {houseCell(1)}
+                      <td colSpan={7} className="px-3 py-2 text-xs text-white/20 italic">hidden</td>
+                    </tr>
+                  );
+                }
 
-                return (
-                  <tr key={`${house}-${tp.planet}`}
-                    className="border-b border-white/5 transition-colors duration-150 hover:bg-white/[0.05]">
-
-                    {/* House — merged across all planets in this house */}
-                    {pi === 0 && (
-                      <td rowSpan={transiting.length} className="px-4 py-3 align-middle border-r border-white/8">
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-xl font-bold tabular-nums leading-none text-amber-300">{house}</span>
-                          {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
-                          {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
-                        </div>
-                      </td>
-                    )}
-
-                    {/* Theme — merged */}
-                    {pi === 0 && (
-                      <td rowSpan={transiting.length} className="px-3 py-3 align-middle border-r border-white/8 max-w-[180px]">
+                if (isEmpty) {
+                  return (
+                    <tr key={`h-${house}`} className="border-b border-white/5">
+                      {houseCell(1)}
+                      <td className="px-3 py-3 border-r border-white/8">
                         <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
                         <p className="mt-0.5 text-[10px] text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
                       </td>
-                    )}
+                      <td colSpan={6} className="px-3 py-3 text-xs text-white/30">—</td>
+                    </tr>
+                  );
+                }
 
-                    {/* Planet */}
-                    <td className="px-4 py-3 font-medium text-white/90">
-                      <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
-                      {tp.planet}
-                      {tp.isRetrograde && (
-                        <span className="ml-1.5 rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
+                return transiting.map((tp, pi) => {
+                  const natal       = natalMap.get(tp.planet);
+                  const signChanged = natal && tp.sign !== natal.sign;
+                  const dignityKey  = tp.dignity.includes('exalted')     ? 'exalted'
+                    : tp.dignity.includes('debilitated') ? 'debilitated'
+                    : tp.dignity.includes('own')         ? 'own'          : 'neutral';
+                  const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
+
+                  return (
+                    <tr key={`${house}-${tp.planet}`}
+                      className="border-b border-white/5 transition-colors duration-150 hover:bg-white/[0.05]">
+
+                      {pi === 0 && houseCell(transiting.length)}
+
+                      {/* Theme — merged */}
+                      {pi === 0 && (
+                        <td rowSpan={transiting.length} className="px-3 py-3 align-middle border-r border-white/8 max-w-[180px]">
+                          <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
+                          <p className="mt-0.5 text-[10px] text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
+                        </td>
                       )}
-                    </td>
 
-                    {/* Transit sign · lord */}
-                    <td className="px-3 py-3">
-                      <div className="flex flex-col gap-0.5">
-                        <span>
-                          <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>{tp.sign}</span>
-                          <span className="ml-2 text-xs tabular-nums text-white/40">{tp.degreeInSign.toFixed(1)}°</span>
+                      {/* Planet */}
+                      <td className="px-4 py-3 font-medium text-white/90">
+                        <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
+                        {tp.planet}
+                        {tp.isRetrograde && (
+                          <span className="ml-1.5 rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
+                        )}
+                      </td>
+
+                      {/* Transit sign · lord */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span>
+                            <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>{tp.sign}</span>
+                            <span className="ml-2 text-xs tabular-nums text-white/40">{tp.degreeInSign.toFixed(1)}°</span>
+                          </span>
+                          {hi?.signLord && <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>}
+                        </div>
+                      </td>
+
+                      {/* vs sign lord */}
+                      <td className="px-3 py-3">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
+                          title={REL_TO_LORD_HINT[rel]}
+                        >
+                          {rel}
                         </span>
-                        {hi?.signLord && <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>}
-                      </div>
-                    </td>
+                        {hi?.signLord && (
+                          <p className="mt-1 text-[10px] leading-tight text-white/35">{tp.planet} → {hi.signLord}</p>
+                        )}
+                      </td>
 
-                    {/* vs sign lord */}
-                    <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
-                        title={REL_TO_LORD_HINT[rel]}
-                      >
-                        {rel}
-                      </span>
-                      {hi?.signLord && (
-                        <p className="mt-1 text-[10px] leading-tight text-white/35">{tp.planet} → {hi.signLord}</p>
-                      )}
-                    </td>
+                      {/* Natal sign */}
+                      <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
+                        {natal
+                          ? <span>{natal.sign} <span className="text-xs text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
+                          : '—'}
+                      </td>
 
-                    {/* Natal sign */}
-                    <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
-                      {natal
-                        ? <span>{natal.sign} <span className="text-xs text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
-                        : '—'}
-                    </td>
+                      {/* Natal house */}
+                      <td className="px-3 py-3 tabular-nums text-white/40">
+                        {natal ? `H${natal.house}` : '—'}
+                      </td>
 
-                    {/* Natal house */}
-                    <td className="px-3 py-3 tabular-nums text-white/40">
-                      {natal ? `H${natal.house}` : '—'}
-                    </td>
-
-                    {/* Dignity */}
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
-                        {dignityKey}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              });
-            })}
-          </tbody>
-        </table>
+                      {/* Dignity */}
+                      <td className="px-3 py-3">
+                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
+                          {dignityKey}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                });
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -875,6 +1044,7 @@ export default function TransitPanel({ chartId, natalLagna }: Props) {
               houseInfo={data.houseInfo ?? []}
               natalPlanets={data.natalPlanets}
               date={selectedDay.date}
+              allDays={data.days}
             />
           )}
 
