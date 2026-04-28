@@ -32,11 +32,20 @@ ssh root@72.60.223.25
 mysql -u root astrology < /var/www/astrology/astrology-backend/scripts/migrate-auth-mysql.sql
 ```
 
-To (re)seed a bcrypt admin password for `admin@admin.com` (edit `scripts/seed-admin.js` if you change the password):
+If migration **stops** at `ALTER TABLE transit_reminders MODIFY user_id` (old rows had `NULL` `user_id`), or `users` exists **without** `is_admin`, run:
+
+```bash
+mysql -u root astrology -e "ALTER TABLE users ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0;"
+mysql -u root astrology < /var/www/astrology/astrology-backend/scripts/fix-transit-reminders-user-id.sql
+```
+
+`fix-transit-reminders-user-id.sql` inserts `admin@admin.com` (password `admin123!@#`) if missing, assigns orphan reminders to the first user, then sets `user_id` to `NOT NULL`.
+
+To (re)seed only the bcrypt hash for that admin on a machine with local `mysql` CLI:
 
 ```bash
 cd /var/www/astrology/astrology-backend
-node scripts/seed-admin.js
+node scripts/seed-admin.js   # Windows-oriented paths; on Linux prefer the SQL fix file or run bcrypt + mysql manually
 ```
 
 **Production `.env`** (backend, not in git): must include at least `PORT`, `DB_*`, `JWT_SECRET`, and **`ADMIN_API_KEY`** for admin HTTP routes and `/admin/login` to return an API key. Without `ADMIN_API_KEY`, `/admin/health` returns **503** (“admin API is disabled”).
@@ -74,7 +83,7 @@ Optional: `pm2 logs astrology-api --lines 80` / `pm2 logs astrology-web --lines 
 | | |
 |---|---|
 | **Date** | 2026-04-28 |
-| **Commit** | `e8c1d5d` — feat: auth, reminders, admin UX, theme, and reminders admin CRUD |
+| **Commit** | `42716eb` — docs + production DB fix (`users.is_admin`, `transit_reminders.user_id`); app commit `e8c1d5d` |
 | **Checks** | `curl` to `127.0.0.1:6600` → **200**; `127.0.0.1:6000` → **200**; both PM2 processes **online** |
 
 ---
