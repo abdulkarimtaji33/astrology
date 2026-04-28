@@ -1,34 +1,23 @@
 -- astrology schema (no data)
--- Generated 2026-03-16T08:25:38.594Z
+-- Generated 2026-04-28T07:17:12.262Z
 
-CREATE TABLE IF NOT EXISTS `users` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `email` varchar(255) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UQ_users_email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `transit_reminders` (
+CREATE TABLE `ai_analyses` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` int NOT NULL,
-  `recipientEmail` varchar(255) NOT NULL,
-  `sendDate` date NOT NULL,
-  `subject` varchar(500) NOT NULL,
-  `placementDetails` text NOT NULL,
-  `note` text DEFAULT NULL,
-  `status` varchar(20) NOT NULL DEFAULT 'pending',
-  `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `birth_record_id` int(11) NOT NULL,
+  `transit_from` varchar(10) NOT NULL,
+  `transit_to` varchar(10) NOT NULL,
+  `basis` varchar(10) NOT NULL,
+  `model` varchar(50) NOT NULL,
+  `prompt` longtext NOT NULL,
+  `response` longtext NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `idx_reminders_user` (`user_id`),
-  KEY `idx_status_sendDate` (`status`, `sendDate`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `idx_ai_birth_record` (`birth_record_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS `birth_records` (
+CREATE TABLE `birth_records` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` int DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
   `name` varchar(255) NOT NULL,
   `birthDate` date NOT NULL,
   `birthTime` time NOT NULL,
@@ -37,8 +26,9 @@ CREATE TABLE IF NOT EXISTS `birth_records` (
   `longitude` decimal(11,8) DEFAULT NULL,
   `timezone` varchar(255) DEFAULT NULL,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  PRIMARY KEY (`id`),
+  KEY `idx_birth_records_user_id` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `cities` (
   `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
@@ -62,7 +52,9 @@ CREATE TABLE `cities` (
   `wikiDataId` varchar(255) DEFAULT NULL COMMENT 'Rapid API GeoDB Cities',
   PRIMARY KEY (`id`),
   KEY `cities_test_ibfk_1` (`state_id`),
-  KEY `cities_test_ibfk_2` (`country_id`)
+  KEY `cities_test_ibfk_2` (`country_id`),
+  CONSTRAINT `cities_ibfk_1` FOREIGN KEY (`state_id`) REFERENCES `states` (`id`),
+  CONSTRAINT `cities_ibfk_2` FOREIGN KEY (`country_id`) REFERENCES `countries` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=160557 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPACT;
 
 CREATE TABLE `countries` (
@@ -100,7 +92,9 @@ CREATE TABLE `countries` (
   `wikiDataId` varchar(255) DEFAULT NULL COMMENT 'Rapid API GeoDB Cities',
   PRIMARY KEY (`id`),
   KEY `country_continent` (`region_id`),
-  KEY `country_subregion` (`subregion_id`)
+  KEY `country_subregion` (`subregion_id`),
+  CONSTRAINT `country_continent_final` FOREIGN KEY (`region_id`) REFERENCES `regions` (`id`),
+  CONSTRAINT `country_subregion_final` FOREIGN KEY (`subregion_id`) REFERENCES `subregions` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=251 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `houses` (
@@ -109,14 +103,6 @@ CREATE TABLE `houses` (
   `main_theme` varchar(100) DEFAULT NULL,
   `represents` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `planet_relationships` (
-  `planet_id` int(11) NOT NULL,
-  `related_planet_id` int(11) NOT NULL,
-  `is_friendly` int(11) DEFAULT NULL,
-  PRIMARY KEY (`planet_id`,`related_planet_id`),
-  KEY `related_planet_id` (`related_planet_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `planetary_avastha` (
@@ -135,6 +121,43 @@ CREATE TABLE `planets` (
   `sanskrit_name` varchar(50) DEFAULT NULL,
   `type` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `planet_drishti` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `planet_id` int(11) NOT NULL,
+  `occupant_house_id` int(11) NOT NULL,
+  `aspected_house_id` int(11) NOT NULL,
+  `sort_order` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_occupant_aspect` (`planet_id`,`occupant_house_id`,`aspected_house_id`),
+  KEY `pd_occ` (`occupant_house_id`),
+  KEY `pd_asp` (`aspected_house_id`),
+  CONSTRAINT `pd_asp` FOREIGN KEY (`aspected_house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pd_occ` FOREIGN KEY (`occupant_house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pd_planet` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `planet_house_interpretations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `planet_id` int(11) NOT NULL,
+  `house_id` int(11) NOT NULL,
+  `interpretation` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_planet_house` (`planet_id`,`house_id`),
+  KEY `fk_phi_house` (`house_id`),
+  CONSTRAINT `phi_house` FOREIGN KEY (`house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `phi_planet` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=92 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `planet_relationships` (
+  `planet_id` int(11) NOT NULL,
+  `related_planet_id` int(11) NOT NULL,
+  `is_friendly` int(11) DEFAULT NULL,
+  PRIMARY KEY (`planet_id`,`related_planet_id`),
+  KEY `related_planet_id` (`related_planet_id`),
+  CONSTRAINT `planet_relationships_ibfk_1` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`),
+  CONSTRAINT `planet_relationships_ibfk_2` FOREIGN KEY (`related_planet_id`) REFERENCES `planets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `regions` (
@@ -170,7 +193,8 @@ CREATE TABLE `states` (
   `wikiDataId` varchar(255) DEFAULT NULL COMMENT 'Rapid API GeoDB Cities',
   `population` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `country_region` (`country_id`)
+  KEY `country_region` (`country_id`),
+  CONSTRAINT `country_region_final` FOREIGN KEY (`country_id`) REFERENCES `countries` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5815 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPACT;
 
 CREATE TABLE `subregions` (
@@ -183,8 +207,35 @@ CREATE TABLE `subregions` (
   `flag` tinyint(1) NOT NULL DEFAULT 1,
   `wikiDataId` varchar(255) DEFAULT NULL COMMENT 'Rapid API GeoDB Cities',
   PRIMARY KEY (`id`),
-  KEY `subregion_continent` (`region_id`)
+  KEY `subregion_continent` (`region_id`),
+  CONSTRAINT `subregion_continent_final` FOREIGN KEY (`region_id`) REFERENCES `regions` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `transit_reminders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `recipientEmail` varchar(255) NOT NULL,
+  `sendDate` date NOT NULL,
+  `subject` varchar(500) NOT NULL,
+  `placementDetails` text NOT NULL,
+  `note` text DEFAULT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'pending',
+  `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_reminders_user` (`user_id`),
+  KEY `idx_status_sendDate` (`status`,`sendDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_admin` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UQ_users_email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `zodiac_signs` (
   `id` int(11) NOT NULL,
@@ -193,32 +244,7 @@ CREATE TABLE `zodiac_signs` (
   `modality` varchar(20) DEFAULT NULL,
   `ruled_by` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `ruled_by` (`ruled_by`)
+  KEY `ruled_by` (`ruled_by`),
+  CONSTRAINT `zodiac_signs_ibfk_1` FOREIGN KEY (`ruled_by`) REFERENCES `planets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS `planet_house_interpretations` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `planet_id` int(11) NOT NULL,
-  `house_id` int(11) NOT NULL,
-  `interpretation` text NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_planet_house` (`planet_id`,`house_id`),
-  KEY `fk_phi_house` (`house_id`),
-  CONSTRAINT `phi_planet` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `phi_house` FOREIGN KEY (`house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS `planet_drishti` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `planet_id` int(11) NOT NULL,
-  `occupant_house_id` int(11) NOT NULL,
-  `aspected_house_id` int(11) NOT NULL,
-  `sort_order` tinyint(3) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_occupant_aspect` (`planet_id`,`occupant_house_id`,`aspected_house_id`),
-  KEY `pd_occ` (`occupant_house_id`),
-  KEY `pd_asp` (`aspected_house_id`),
-  CONSTRAINT `pd_planet` FOREIGN KEY (`planet_id`) REFERENCES `planets` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `pd_occ` FOREIGN KEY (`occupant_house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `pd_asp` FOREIGN KEY (`aspected_house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

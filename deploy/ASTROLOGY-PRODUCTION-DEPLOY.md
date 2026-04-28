@@ -48,7 +48,7 @@ cd /var/www/astrology/astrology-backend
 node scripts/seed-admin.js   # Windows-oriented paths; on Linux prefer the SQL fix file or run bcrypt + mysql manually
 ```
 
-**Production `.env`** (backend, not in git): must include at least `PORT`, `DB_*`, `JWT_SECRET`, and **`ADMIN_API_KEY`** for admin HTTP routes and `/admin/login` to return an API key. Without `ADMIN_API_KEY`, `/admin/health` returns **503** (“admin API is disabled”).
+**Production `.env`** (backend, not in git): must include at least `PORT`, `DB_*`, and `JWT_SECRET`. Admin UI signs in with email/password and receives a JWT; **`ADMIN_API_KEY` is optional** (legacy `X-Admin-Key` when set).
 
 Frontend **`.env.production`** (typical): `INTERNAL_NEXT_ORIGIN=http://127.0.0.1:6600`; optional `BACKEND_URL=http://127.0.0.1:6000` if not using the default.
 

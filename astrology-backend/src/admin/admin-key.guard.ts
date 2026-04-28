@@ -1,6 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable, ServiceUnavailableException, SetMetadata, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, SetMetadata, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import * as jwt from 'jsonwebtoken';
 
 export const SkipAdminGuard = () => SetMetadata('skipAdminGuard', true);
 
@@ -15,11 +16,26 @@ export class AdminKeyGuard implements CanActivate {
     ]);
     if (skip) return true;
 
-    const apiKey = process.env.ADMIN_API_KEY;
-    if (!apiKey) throw new ServiceUnavailableException('ADMIN_API_KEY is not configured');
     const req = context.switchToHttp().getRequest<Request>();
-    const provided = req.header('x-admin-key');
-    if (provided && provided === apiKey) return true;
+
+    // Optional legacy: X-Admin-Key when ADMIN_API_KEY is set (automation / break-glass)
+    const apiKey = process.env.ADMIN_API_KEY;
+    const providedKey = req.header('x-admin-key');
+    if (apiKey && providedKey && providedKey === apiKey) return true;
+
+    // Primary: Bearer JWT from POST /admin/login (isAdmin must be true)
+    const auth = req.header('authorization') ?? '';
+    if (auth.startsWith('Bearer ')) {
+      const token = auth.slice(7);
+      try {
+        const secret = process.env.JWT_SECRET || 'dev-insecure';
+        const payload = jwt.verify(token, secret) as { isAdmin?: boolean };
+        if (payload?.isAdmin === true) return true;
+      } catch {
+        /* invalid token */
+      }
+    }
+
     throw new UnauthorizedException('Admin access required');
   }
 }

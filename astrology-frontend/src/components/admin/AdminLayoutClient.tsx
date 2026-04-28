@@ -1,6 +1,6 @@
 "use client";
 
-import adminApi, { clearAdminKey, getAdminKey, setAdminKey, getAdminJwt } from "@/lib/adminApi";
+import adminApi, { clearAdminKey, clearAdminLegacyKey, getAdminKey, getAdminJwt, setAdminKey, setAdminJwt } from "@/lib/adminApi";
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -446,8 +446,9 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     setAuthError(null);
     setAuthLoading(true);
     try {
-      const res = await adminApi.post<{ apiKey: string }>("/admin/login", { email, password });
-      setAdminKey(res.data.apiKey);
+      const res = await adminApi.post<{ accessToken: string }>("/admin/login", { email, password });
+      clearAdminLegacyKey();
+      setAdminJwt(res.data.accessToken);
       await verifyAccess();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;

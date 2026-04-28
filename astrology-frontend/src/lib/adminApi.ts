@@ -28,6 +28,10 @@ export function clearAdminKey() {
   localStorage.removeItem(TOKEN_STORAGE);
 }
 
+export function clearAdminLegacyKey() {
+  if (typeof window !== "undefined") localStorage.removeItem(KEY_STORAGE);
+}
+
 // ── JWT (email/password admin) ────────────────────────────────────────────
 export function getAdminJwt(): string {
   if (typeof window === "undefined") return "";

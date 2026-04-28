@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Brackets, In, Repository } from 'typeorm';
 import { User } from '../auth/user.entity';
+import type { JwtPayload } from '../auth/jwt.strategy';
 import { BirthRecord } from '../birth-records/birth-record.entity';
 import { AiAnalysis } from '../birth-records/ai-analysis.entity';
 import { City } from '../cities/city.entity';
@@ -70,17 +72,17 @@ export class AdminService {
     @InjectRepository(State) private readonly state: Repository<State>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(TransitReminder) private readonly reminders: Repository<TransitReminder>,
+    private readonly jwt: JwtService,
   ) {}
 
-  async adminLogin(email: string, password: string): Promise<{ apiKey: string }> {
+  async adminLogin(email: string, password: string): Promise<{ accessToken: string }> {
     const user = await this.users.findOne({ where: { email: email.toLowerCase() } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
     if (!user.isAdmin) throw new UnauthorizedException('Not an admin account');
-    const apiKey = process.env.ADMIN_API_KEY;
-    if (!apiKey) throw new UnauthorizedException('Admin API key not configured on server');
-    return { apiKey };
+    const payload: JwtPayload = { sub: user.id, email: user.email, isAdmin: true };
+    return { accessToken: this.jwt.sign(payload) };
   }
 
   async health(): Promise<{ ok: boolean }> {
