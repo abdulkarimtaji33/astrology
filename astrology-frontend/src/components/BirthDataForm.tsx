@@ -4,9 +4,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { saveRecentChart } from '@/components/RecentCharts';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
+import { useAuth } from '@/contexts/auth-context';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface CityResult {
@@ -31,7 +34,10 @@ type FormData = z.infer<typeof schema>;
 // ─── Component ─────────────────────────────────────────────────────────────
 export default function BirthDataForm() {
   const router = useRouter();
+  const qc = useQueryClient();
+  const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [errMsg, setErrMsg] = useState('');
 
   // City search state
   const [cityQuery, setCityQuery] = useState('');
@@ -75,6 +81,7 @@ export default function BirthDataForm() {
 
   const onSubmit = async (data: FormData) => {
     setStatus('loading');
+    setErrMsg('');
     try {
       const payload = {
         ...data,
@@ -84,39 +91,72 @@ export default function BirthDataForm() {
         timezone: selectedCity?.timezone ?? undefined,
       };
       const res = await api.post<{ id: number }>('/birth-records', payload);
-      saveRecentChart({
-        id: res.data.id,
-        name: data.name,
-        birthDate: data.birthDate,
-        cityName: payload.cityName,
-      });
+      void qc.invalidateQueries({ queryKey: ['my-charts'] });
       router.push(`/chart/${res.data.id}`);
-    } catch {
+    } catch (e: unknown) {
+      if (isAxiosError(e) && e.response?.status === 401) {
+        setErrMsg('Session expired. Please sign in again.');
+      } else {
+        setErrMsg('Something went wrong. Please try again.');
+      }
       setStatus('error');
     }
   };
 
   const inputClass =
-    'w-full rounded-xl border border-white/15 bg-slate-900/60 px-4 py-3 text-white placeholder:text-white/35 transition focus:border-amber-400/70 focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:bg-slate-900/80';
+    'app-input rounded-xl px-4 py-3 [color-scheme:light] dark:[color-scheme:dark]';
+
+  if (authLoading) {
+    return (
+      <div className="flex h-64 w-full max-w-md animate-pulse flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/60 p-8 dark:border-white/10 dark:bg-white/[0.04]" />
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="app-card flex w-full max-w-md flex-col gap-6 p-8">
+        <div>
+          <h2 className="text-xl font-medium tracking-wide text-slate-900 dark:text-white/95">
+            Sign in required
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-white/55">
+            Charts are private to your account. Sign in or register to create and open charts.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/login"
+            className="rounded-xl bg-amber-500 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 dark:bg-amber-400 dark:text-slate-900 dark:hover:bg-amber-300"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/register"
+            className="rounded-xl border border-slate-300 px-5 py-3 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
+          >
+            Create account
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="flex w-full max-w-md flex-col gap-6 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md sm:p-8"
+      className="app-card flex w-full max-w-md flex-col gap-6 p-6 sm:p-8"
     >
       <div>
-        <h2 className="text-xl font-medium tracking-wide text-white/95 sm:text-2xl">
+        <h2 className="text-xl font-medium tracking-wide text-slate-900 sm:text-2xl dark:text-white/95">
           Your birth details
         </h2>
-        <p className="mt-1 text-sm text-white/60">
-          Enter your birth data for a Vedic lagna chart.
-        </p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-white/60">Enter your birth data for a Vedic lagna chart.</p>
       </div>
 
       <div className="flex flex-col gap-4">
         {/* Name */}
         <div>
-          <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-white/80">
+          <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
             Full name
           </label>
           <input
@@ -126,46 +166,50 @@ export default function BirthDataForm() {
             {...register('name')}
             className={inputClass}
           />
-          {errors.name && <p className="mt-1 text-sm text-amber-300/90">{errors.name.message}</p>}
+          {errors.name && (
+            <p className="mt-1 text-sm text-amber-700 dark:text-amber-300/90">{errors.name.message}</p>
+          )}
         </div>
 
         {/* Date & Time */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="birthDate" className="mb-1.5 block text-sm font-medium text-white/80">
+            <label htmlFor="birthDate" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
               Birth date
             </label>
             <input
               id="birthDate"
               type="date"
               {...register('birthDate')}
-              className={`${inputClass} [color-scheme:dark]`}
+              className={inputClass}
             />
             {errors.birthDate && (
-              <p className="mt-1 text-sm text-amber-300/90">{errors.birthDate.message}</p>
+              <p className="mt-1 text-sm text-amber-700 dark:text-amber-300/90">{errors.birthDate.message}</p>
             )}
           </div>
           <div>
-            <label htmlFor="birthTime" className="mb-1.5 block text-sm font-medium text-white/80">
+            <label htmlFor="birthTime" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
               Birth time
             </label>
             <input
               id="birthTime"
               type="time"
               {...register('birthTime')}
-              className={`${inputClass} [color-scheme:dark]`}
+              className={inputClass}
             />
             {errors.birthTime && (
-              <p className="mt-1 text-sm text-amber-300/90">{errors.birthTime.message}</p>
+              <p className="mt-1 text-sm text-amber-700 dark:text-amber-300/90">{errors.birthTime.message}</p>
             )}
           </div>
         </div>
 
         {/* City search */}
         <div className="relative" ref={dropdownRef}>
-          <label htmlFor="citySearch" className="mb-1.5 block text-sm font-medium text-white/80">
+          <label htmlFor="citySearch" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
             Birth city
-            <span className="ml-1 text-white/40 font-normal">(optional — for accurate lagna)</span>
+            <span className="ml-1 font-normal text-slate-500 dark:text-white/40">
+              (optional — for accurate lagna)
+            </span>
           </label>
           <input
             id="citySearch"
@@ -183,12 +227,12 @@ export default function BirthDataForm() {
           />
 
           {showDropdown && cityResults.length > 0 && (
-            <ul className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-white/15 bg-slate-900 shadow-2xl">
+            <ul className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-white/15 dark:bg-slate-900">
               {cityResults.map((city) => (
                 <li key={city.id}>
                   <button
                     type="button"
-                    className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/10 transition flex items-baseline gap-2"
+                    className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:text-white/80 dark:hover:bg-white/10"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       setSelectedCity(city);
@@ -196,8 +240,8 @@ export default function BirthDataForm() {
                       setShowDropdown(false);
                     }}
                   >
-                    <span className="font-medium text-white">{city.name}</span>
-                    <span className="text-white/40 text-xs">
+                    <span className="font-medium text-slate-900 dark:text-white">{city.name}</span>
+                    <span className="text-xs text-slate-500 dark:text-white/40">
                       {city.stateCode}, {city.countryCode}
                       {city.timezone ? ` · ${city.timezone}` : ''}
                     </span>
@@ -208,7 +252,7 @@ export default function BirthDataForm() {
           )}
 
           {selectedCity && (
-            <div className="mt-1.5 flex items-center gap-2 text-xs text-white/50">
+            <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500 dark:text-white/50">
               <span>
                 lat {parseFloat(selectedCity.latitude).toFixed(4)}, lon{' '}
                 {parseFloat(selectedCity.longitude).toFixed(4)}
@@ -216,7 +260,7 @@ export default function BirthDataForm() {
               <button
                 type="button"
                 onClick={() => { setSelectedCity(null); setCityQuery(''); }}
-                className="text-amber-400/70 hover:text-amber-400 transition"
+                className="text-amber-600 transition hover:text-amber-700 dark:text-amber-400/70 dark:hover:text-amber-400"
               >
                 ✕ clear
               </button>
@@ -226,15 +270,15 @@ export default function BirthDataForm() {
       </div>
 
       {status === 'error' && (
-        <p className="rounded-lg bg-red-500/20 px-4 py-2 text-sm text-red-200">
-          Something went wrong. Please try again.
+        <p className="rounded-lg bg-red-100 px-4 py-2 text-sm text-red-800 dark:bg-red-500/20 dark:text-red-200">
+          {errMsg}
         </p>
       )}
 
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="mt-2 rounded-xl bg-amber-400 px-6 py-3.5 font-medium text-slate-900 transition hover:bg-amber-300 disabled:opacity-60"
+        className="mt-2 rounded-xl bg-amber-500 px-6 py-3.5 font-medium text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-60 dark:bg-amber-400 dark:text-slate-900 dark:hover:bg-amber-300"
       >
         {status === 'loading' ? 'Generating chart…' : 'Generate Birth Chart →'}
       </button>

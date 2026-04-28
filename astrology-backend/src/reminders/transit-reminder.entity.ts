@@ -11,7 +11,10 @@ export class TransitReminder {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ type: 'int', name: 'user_id' })
+  userId: number;
+
+  @Column({ length: 255 })
   recipientEmail: string;
 
   /** ISO date string: when to send the email (YYYY-MM-DD) */

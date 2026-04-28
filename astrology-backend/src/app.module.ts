@@ -10,6 +10,7 @@ import { WorldEventsModule } from './world-events/world-events.module';
 import { ORM_ENTITIES } from './orm-entities';
 import { AdminModule } from './admin/admin.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { RemindersModule } from './reminders/reminders.module';
         connectTimeout: 600000, // 
       },
     }),
+    AuthModule,
     BirthRecordsModule,
     CitiesModule,
     WorldEventsModule,

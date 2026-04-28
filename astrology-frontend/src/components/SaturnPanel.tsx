@@ -81,10 +81,10 @@ export default function SaturnPanel({ chartId }: Props) {
   return (
     <div className="flex flex-col gap-6">
       {/* Status banner */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
+      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-white/40">Natal Moon Sign</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-500 dark:text-white/40">Natal Moon Sign</p>
             <p className="mt-1 text-xl font-semibold text-amber-300">{natalMoonSign}</p>
           </div>
           <div className="flex flex-wrap gap-3 ml-auto">
@@ -92,33 +92,33 @@ export default function SaturnPanel({ chartId }: Props) {
               label="Sade Sati"
               active={isInSadeSati}
               activeClass="border-red-400/40 bg-red-500/15 text-red-300"
-              inactiveClass="border-white/10 bg-white/5 text-white/40"
+              inactiveClass="border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 text-slate-500 dark:text-white/40"
             />
             <StatusBadge
               label="Dhaiyya (Kantaka Shani)"
               active={isInDhaiyya}
               activeClass="border-orange-400/40 bg-orange-500/15 text-orange-300"
-              inactiveClass="border-white/10 bg-white/5 text-white/40"
+              inactiveClass="border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 text-slate-500 dark:text-white/40"
             />
           </div>
         </div>
 
         {currentPeriod && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-white/40 mb-2">Currently Active</p>
+          <div className="mt-4 rounded-xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-4">
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-500 dark:text-white/40 mb-2">Currently Active</p>
             <PeriodCard period={currentPeriod} highlight />
           </div>
         )}
 
         {!currentPeriod && (
-          <p className="mt-4 text-sm text-white/40 italic">Not currently in Sade Sati or Dhaiyya.</p>
+          <p className="mt-4 text-sm text-slate-500 dark:text-white/40 italic">Not currently in Sade Sati or Dhaiyya.</p>
         )}
       </div>
 
       {/* Sade Sati */}
       <Section title="Sade Sati" subtitle="Saturn transiting 12th, 1st, and 2nd from Moon — 7.5-year cycle">
         {sadeSatiPeriods.length === 0
-          ? <p className="text-sm text-white/40 italic">No Sade Sati periods in the ±30 year window.</p>
+          ? <p className="text-sm text-slate-500 dark:text-white/40 italic">No Sade Sati periods in the ±30 year window.</p>
           : sadeSatiPeriods.map((p, i) => <PeriodCard key={i} period={p} />)
         }
       </Section>
@@ -126,15 +126,15 @@ export default function SaturnPanel({ chartId }: Props) {
       {/* Dhaiyya */}
       <Section title="Dhaiyya (Kantaka Shani)" subtitle="Saturn transiting 4th or 8th from Moon — ~2.5 years each">
         {dhaiyyaPeriods.length === 0
-          ? <p className="text-sm text-white/40 italic">No Dhaiyya periods in the ±30 year window.</p>
+          ? <p className="text-sm text-slate-500 dark:text-white/40 italic">No Dhaiyya periods in the ±30 year window.</p>
           : dhaiyyaPeriods.map((p, i) => <PeriodCard key={i} period={p} />)
         }
       </Section>
 
       {/* Info note */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/40 leading-relaxed">
-        <strong className="text-white/60">Sade Sati</strong> is a 7½-year period when Saturn transits through the sign before, the natal Moon sign, and the sign after. Each phase is ~2½ years.<br />
-        <strong className="text-white/60 mt-2 block">Dhaiyya (Kantaka Shani)</strong> occurs when Saturn transits the 4th or 8th house from natal Moon — each episode lasts ~2½ years and is considered challenging.
+      <div className="rounded-xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-4 text-xs text-slate-500 dark:text-white/40 leading-relaxed">
+        <strong className="text-slate-600 dark:text-white/60">Sade Sati</strong> is a 7½-year period when Saturn transits through the sign before, the natal Moon sign, and the sign after. Each phase is ~2½ years.<br />
+        <strong className="text-slate-600 dark:text-white/60 mt-2 block">Dhaiyya (Kantaka Shani)</strong> occurs when Saturn transits the 4th or 8th house from natal Moon — each episode lasts ~2½ years and is considered challenging.
       </div>
     </div>
   );
@@ -152,9 +152,9 @@ function StatusBadge({ label, active, activeClass, inactiveClass }: {
 
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
-      <h3 className="text-base font-semibold text-white/90">{title}</h3>
-      <p className="mt-0.5 text-xs text-white/40">{subtitle}</p>
+    <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-5 backdrop-blur-md">
+      <h3 className="text-base font-semibold text-slate-900 dark:text-white/90">{title}</h3>
+      <p className="mt-0.5 text-xs text-slate-500 dark:text-white/40">{subtitle}</p>
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </div>
   );
@@ -168,7 +168,7 @@ function PeriodCard({ period, highlight = false }: { period: SaturnPeriod; highl
 
   const borderColor = period.isActive
     ? isSadeSati ? 'border-red-400/40' : 'border-orange-400/40'
-    : period.isPast ? 'border-white/5' : 'border-white/10';
+    : period.isPast ? 'border-slate-200/70 dark:border-white/5' : 'border-slate-200/90 dark:border-white/10';
   const bgColor = period.isActive
     ? isSadeSati ? 'bg-red-500/10' : 'bg-orange-500/10'
     : 'bg-white/3';
@@ -181,7 +181,7 @@ function PeriodCard({ period, highlight = false }: { period: SaturnPeriod; highl
             <span className={`text-sm font-semibold ${isSadeSati ? 'text-red-300' : 'text-orange-300'}`}>
               ♄ {period.saturnSign}
             </span>
-            <span className="text-xs text-white/40">· House {houseLabel} from Moon</span>
+            <span className="text-xs text-slate-500 dark:text-white/40">· House {houseLabel} from Moon</span>
             {period.isActive && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isSadeSati ? 'bg-red-500/20 text-red-300' : 'bg-orange-500/20 text-orange-300'}`}>
                 ACTIVE
@@ -192,19 +192,19 @@ function PeriodCard({ period, highlight = false }: { period: SaturnPeriod; highl
             )}
           </div>
           {isSadeSati && period.phase && (
-            <p className="mt-0.5 text-xs text-white/50">Phase: {PHASE_LABEL[period.phase]}</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-white/50">Phase: {PHASE_LABEL[period.phase]}</p>
           )}
         </div>
-        <div className="text-right text-xs text-white/50 tabular-nums">
+        <div className="text-right text-xs text-slate-500 dark:text-white/50 tabular-nums">
           <div>{fmt(period.startDate)}</div>
-          <div className="text-white/30">to</div>
+          <div className="text-slate-400 dark:text-white/30">to</div>
           <div>{fmt(period.endDate)}</div>
         </div>
       </div>
 
       {pct !== null && (
         <div className="mt-3">
-          <div className="flex justify-between text-[10px] text-white/40 mb-1">
+          <div className="flex justify-between text-[10px] text-slate-500 dark:text-white/40 mb-1">
             <span>Progress</span>
             <span>{pct}%</span>
           </div>

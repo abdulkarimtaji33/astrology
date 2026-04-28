@@ -68,17 +68,17 @@ function HouseCell({
     <g>
       <polygon
         points={pts(poly)}
-        fill={isLagna ? 'rgba(251,191,36,0.07)' : 'rgba(255,255,255,0.02)'}
-        stroke={isLagna ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.18)'}
+        fill={isLagna ? 'var(--chart-fill-lagna)' : 'var(--chart-cell)'}
+        stroke={isLagna ? 'var(--chart-stroke-lagna)' : 'var(--chart-stroke)'}
         strokeWidth="0.8"
       />
       <text x={cx} y={startY}
-        textAnchor="middle" fill="rgba(255,255,255,0.22)"
+        textAnchor="middle" fill="var(--chart-text-dim)"
         fontSize="8.5" fontFamily="system-ui,sans-serif">
         {house}
       </text>
       <text x={cx} y={startY + lineH}
-        textAnchor="middle" fill="rgba(165,180,252,0.85)"
+        textAnchor="middle" fill="var(--chart-text-sign)"
         fontSize="10" fontWeight="500" fontFamily="system-ui,sans-serif">
         {SIGN_ABBR[sign] ?? sign}
       </text>
@@ -140,7 +140,7 @@ export function DiamondChart({ chart }: { chart: ChartShape }) {
           isLagna={h === 1} />;
       })}
       <text x={C} y={C/2 - 6} textAnchor="middle"
-        fill="rgba(251,191,36,0.95)" fontSize="11" fontWeight="700"
+        fill="var(--chart-lagna-label)" fontSize="11" fontWeight="700"
         fontFamily="system-ui,sans-serif">
         {chart.lagna.sign}
       </text>

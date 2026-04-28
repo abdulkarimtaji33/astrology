@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsEmail,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -8,7 +10,9 @@ import {
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 
 /* birth records */
@@ -155,4 +159,26 @@ export class AdminCityWriteDto {
   @IsOptional() @IsString() translations?: string;
   @IsOptional() @Type(() => Number) @IsInt() flag?: number;
   @IsOptional() @IsString() wikiDataId?: string;
+}
+
+const REMINDER_STATUSES = ['pending', 'sent', 'failed'] as const;
+
+export class AdminCreateReminderDto {
+  @Type(() => Number) @IsInt() @Min(1) userId: number;
+  @IsEmail() recipientEmail: string;
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) sendDate: string;
+  @IsString() @MinLength(1) @MaxLength(500) subject: string;
+  @IsString() @MinLength(1) placementDetails: string;
+  @IsOptional() @IsString() @MaxLength(2000) note?: string;
+  @IsOptional() @IsIn(REMINDER_STATUSES) status?: (typeof REMINDER_STATUSES)[number];
+}
+
+export class AdminPatchReminderDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) userId?: number;
+  @IsOptional() @IsEmail() recipientEmail?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) sendDate?: string;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(500) subject?: string;
+  @IsOptional() @IsString() @MinLength(1) placementDetails?: string;
+  @IsOptional() @IsString() @MaxLength(2000) note?: string;
+  @IsOptional() @IsIn(REMINDER_STATUSES) status?: (typeof REMINDER_STATUSES)[number];
 }

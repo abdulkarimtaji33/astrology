@@ -1,8 +1,9 @@
 import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreateReminderDto {
+  @IsOptional()
   @IsEmail()
-  recipientEmail: string;
+  recipientEmail?: string;
 
   /** YYYY-MM-DD */
   @IsString()

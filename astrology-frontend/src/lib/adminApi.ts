@@ -12,25 +12,41 @@ const adminApi = axios.create({
   timeout: 120_000,
 });
 
-const STORAGE = "astrologyAdminKey";
+const KEY_STORAGE   = "astrologyAdminKey";
+const TOKEN_STORAGE = "astrologyAdminJwt";
 
+// ── API key (legacy) ──────────────────────────────────────────────────────
 export function getAdminKey(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem(STORAGE) ?? "";
+  return localStorage.getItem(KEY_STORAGE) ?? "";
 }
-
 export function setAdminKey(key: string) {
-  localStorage.setItem(STORAGE, key);
+  localStorage.setItem(KEY_STORAGE, key);
 }
-
 export function clearAdminKey() {
-  localStorage.removeItem(STORAGE);
+  localStorage.removeItem(KEY_STORAGE);
+  localStorage.removeItem(TOKEN_STORAGE);
 }
 
+// ── JWT (email/password admin) ────────────────────────────────────────────
+export function getAdminJwt(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(TOKEN_STORAGE) ?? "";
+}
+export function setAdminJwt(token: string) {
+  localStorage.setItem(TOKEN_STORAGE, token);
+}
+
+// ── Request interceptor ───────────────────────────────────────────────────
 adminApi.interceptors.request.use((config) => {
+  const jwt = getAdminJwt();
+  if (jwt) {
+    (config.headers as Record<string, string>)["Authorization"] = `Bearer ${jwt}`;
+    return config;
+  }
   const k = getAdminKey();
   if (k) {
-    (config.headers as { "X-Admin-Key"?: string })["X-Admin-Key"] = k;
+    (config.headers as Record<string, string>)["X-Admin-Key"] = k;
   }
   return config;
 });

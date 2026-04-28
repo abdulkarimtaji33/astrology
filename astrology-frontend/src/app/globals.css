@@ -1,28 +1,77 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --app-bg: #f7f5ff;
+  --app-fg: #0f172a;
+  --app-fg-muted: #475569;
+  --app-border: rgba(15, 23, 42, 0.1);
+  --app-border-strong: rgba(15, 23, 42, 0.16);
+  --nav-bg: rgba(255, 255, 255, 0.82);
+  --glow-1: rgba(99, 102, 241, 0.14);
+  --glow-2: rgba(217, 119, 6, 0.09);
+  --glow-3: rgba(139, 92, 246, 0.11);
+  --chart-cell: rgba(99, 102, 241, 0.08);
+  --chart-stroke: rgba(15, 23, 42, 0.14);
+  --chart-stroke-lagna: rgba(180, 83, 9, 0.5);
+  --chart-fill-lagna: rgba(251, 191, 36, 0.12);
+  --chart-text-dim: rgba(15, 23, 42, 0.4);
+  --chart-text-sign: rgba(67, 56, 202, 0.95);
+  --chart-lagna-label: rgba(180, 83, 9, 0.95);
+}
+
+html.dark {
+  --app-bg: #020617;
+  --app-fg: #f8fafc;
+  --app-fg-muted: rgba(248, 250, 252, 0.55);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-border-strong: rgba(255, 255, 255, 0.15);
+  --nav-bg: rgba(2, 6, 23, 0.88);
+  --glow-1: rgba(99, 102, 241, 0.18);
+  --glow-2: rgba(251, 191, 36, 0.1);
+  --glow-3: rgba(139, 92, 246, 0.12);
+  --chart-cell: rgba(255, 255, 255, 0.02);
+  --chart-stroke: rgba(255, 255, 255, 0.18);
+  --chart-stroke-lagna: rgba(251, 191, 36, 0.45);
+  --chart-fill-lagna: rgba(251, 191, 36, 0.07);
+  --chart-text-dim: rgba(255, 255, 255, 0.22);
+  --chart-text-sign: rgba(165, 180, 252, 0.85);
+  --chart-lagna-label: rgba(251, 191, 36, 0.95);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--app-bg);
+  --color-foreground: var(--app-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Skip link — keyboard / screen reader friendly */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--app-fg);
+  color: var(--app-bg);
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid rgb(251 191 36);
+  outline-offset: 2px;
 }
 
 .scrollbar-hide {
@@ -37,12 +86,103 @@ body {
   position: relative;
 }
 .nav-border-glow::after {
-  content: '';
+  content: "";
   display: block;
   position: absolute;
   bottom: -1px;
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(251,191,36,0.25), transparent);
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(217, 119, 6, 0.35),
+    transparent
+  );
+}
+html.dark .nav-border-glow::after {
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(251, 191, 36, 0.28),
+    transparent
+  );
+}
+
+/** Shared page shell: gradient + optional glow orbs */
+.app-shell {
+  position: relative;
+  min-height: calc(100vh - 3rem);
+  overflow: hidden;
+  background: linear-gradient(
+    to bottom right,
+    rgb(248 250 252),
+    rgb(238 242 255 / 0.92),
+    rgb(245 243 255)
+  );
+  color: var(--app-fg);
+}
+html.dark .app-shell {
+  background: linear-gradient(
+    to bottom right,
+    rgb(2 6 23),
+    rgb(30 27 75 / 0.8),
+    rgb(2 6 23)
+  );
+}
+
+.app-shell-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+}
+html.dark .app-shell-glow {
+  opacity: 0.4;
+}
+
+/** Card / panel surfaces */
+.app-card {
+  border-radius: 1rem;
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(12px);
+}
+html.dark .app-card {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.app-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 0.75rem 1rem;
+  color: var(--app-fg);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+.app-input::placeholder {
+  color: var(--app-fg-muted);
+  opacity: 0.75;
+}
+.app-input:hover {
+  border-color: rgba(217, 119, 6, 0.35);
+}
+.app-input:focus {
+  outline: none;
+  border-color: rgba(217, 119, 6, 0.65);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+}
+html.dark .app-input {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+html.dark .app-input:focus {
+  border-color: rgba(251, 191, 36, 0.65);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.12);
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import adminApi, { clearAdminKey, getAdminKey, setAdminKey } from "@/lib/adminApi";
+import adminApi, { clearAdminKey, getAdminKey, setAdminKey, getAdminJwt } from "@/lib/adminApi";
+import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
@@ -11,6 +12,7 @@ const NAV = [
   { href: "/admin",              label: "Dashboard",     icon: IcoDash,    group: "main" },
   { href: "/admin/birth-records",label: "Birth records", icon: IcoUsers,   group: "core" },
   { href: "/admin/ai-analyses",  label: "AI analyses",   icon: IcoSpark,   group: "core" },
+  { href: "/admin/reminders",    label: "Reminders",     icon: IcoBell,    group: "core" },
   { href: "/admin/jyotish",      label: "Jyotish data",  icon: IcoStar,    group: "data" },
   { href: "/admin/geo",          label: "Geography",     icon: IcoGlobe,   group: "data" },
 ] as const;
@@ -57,6 +59,14 @@ function IcoSpark({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.2 3.2l2.1 2.1M10.7 10.7l2.1 2.1M3.2 12.8l2.1-2.1M10.7 5.3l2.1-2.1" />
       <circle cx="8" cy="8" r="2" />
+    </svg>
+  );
+}
+function IcoBell({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6a4 4 0 1 1 8 0c0 4 2 6 2 6H2s2-2 2-6" />
+      <path d="M7 14h2" />
     </svg>
   );
 }
@@ -127,14 +137,14 @@ function NavLink({
       className={cx(
         "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
         active
-          ? "bg-white/[0.08] text-white"
-          : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100",
+          ? "bg-cyan-100 text-cyan-950 dark:bg-white/[0.08] dark:text-white"
+          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-zinc-100",
       )}
     >
       <span
         className={cx(
           "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-          active ? "bg-cyan-500 text-zinc-950 shadow-md shadow-cyan-950/40" : "text-zinc-500 group-hover:text-zinc-300",
+          active ? "bg-cyan-500 text-zinc-950 shadow-md shadow-cyan-950/40" : "text-zinc-500 group-hover:text-zinc-700 dark:text-zinc-500 dark:group-hover:text-zinc-300",
         )}
       >
         <Icon className="h-3.5 w-3.5" />
@@ -165,18 +175,21 @@ function Sidebar({
   return (
     <div className="flex h-full flex-col">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-5">
+      <div className="flex w-full items-center gap-3 px-4 py-5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500 text-zinc-950 shadow-md shadow-cyan-950/40">
           <IcoBrand className="h-4 w-4" />
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-cyan-500">Jyotish</p>
-          <p className="text-xs font-medium text-zinc-400">Control center</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-cyan-700 dark:text-cyan-500">Jyotish</p>
+          <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Control center</p>
+        </div>
+        <div className="ml-auto">
+          <ThemeToggle />
         </div>
       </div>
 
       {/* Divider */}
-      <div className="mx-4 h-px bg-white/[0.06]" />
+      <div className="mx-4 h-px bg-zinc-200 dark:bg-white/[0.06]" />
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-4">
@@ -205,7 +218,7 @@ function Sidebar({
       </nav>
 
       {/* Footer */}
-      <div className="mx-4 h-px bg-white/[0.06]" />
+      <div className="mx-4 h-px bg-zinc-200 dark:bg-white/[0.06]" />
       <div className="px-2 py-3">
         <div className="mb-1 flex items-center gap-2 px-3 py-1">
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -242,20 +255,21 @@ function TopBar({
   )?.label ?? "Admin";
 
   return (
-    <div className="flex h-14 items-center gap-3 border-b border-white/[0.06] bg-zinc-950/80 px-4 backdrop-blur-md">
+    <div className="flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/90 px-4 backdrop-blur-md dark:border-white/[0.06] dark:bg-zinc-950/80">
       <button
         type="button"
         onClick={onMenuToggle}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
       >
         {menuOpen ? <IcoX className="h-4 w-4" /> : <IcoMenu className="h-4 w-4" />}
       </button>
-      <div className="flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded bg-cyan-500 text-zinc-950">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-cyan-500 text-zinc-950">
           <IcoBrand className="h-3.5 w-3.5" />
         </div>
-        <span className="text-sm font-medium text-zinc-200">{currentLabel}</span>
+        <span className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">{currentLabel}</span>
       </div>
+      <ThemeToggle />
     </div>
   );
 }
@@ -284,55 +298,109 @@ function LoadingScreen() {
 /* ─── Login screen ────────────────────────────────────────────────────────── */
 
 function LoginScreen({
-  onSubmit,
+  onEmailLogin,
+  onKeyLogin,
   loading,
   error,
 }: {
-  onSubmit: (k: string) => void;
+  onEmailLogin: (email: string, password: string) => void;
+  onKeyLogin: (k: string) => void;
   loading: boolean;
   error: string | null;
 }) {
+  const [mode, setMode] = useState<"email" | "key">("email");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [key, setKey] = useState("");
+
+  const submit = () => {
+    if (loading) return;
+    if (mode === "email") { if (email && password) onEmailLogin(email, password); }
+    else { if (key) onKeyLogin(key); }
+  };
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-zinc-950 px-4">
-      {/* Ambient glow */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-1/2 top-1/3 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/[0.05] blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-sm">
-        {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500 text-zinc-950 shadow-2xl shadow-cyan-950/40">
             <IcoBrand className="h-7 w-7" />
           </div>
           <div className="text-center">
             <h1 className="text-lg font-semibold text-white">Jyotish Admin</h1>
-            <p className="mt-1 text-sm text-zinc-500">Enter your API key to continue</p>
+            <p className="mt-1 text-sm text-zinc-500">Sign in to continue</p>
           </div>
         </div>
 
-        {/* Card */}
+        {/* Mode toggle */}
+        <div className="mb-4 flex rounded-lg border border-white/[0.08] bg-zinc-900 p-1">
+          {(["email", "key"] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cx(
+                "flex-1 rounded-md py-1.5 text-xs font-medium transition",
+                mode === m
+                  ? "bg-cyan-500 text-zinc-950 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300",
+              )}
+            >
+              {m === "email" ? "Email & Password" : "API Key"}
+            </button>
+          ))}
+        </div>
+
         <div className="rounded-2xl border border-white/[0.08] bg-zinc-900 p-6 shadow-2xl">
-          <label className="block">
-            <span className="mb-2 block text-xs font-medium text-zinc-400">API Key</span>
-            <input
-              type="password"
-              autoFocus
-              placeholder="••••••••••••••••"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && key && !loading && onSubmit(key)}
-              className="w-full rounded-lg border border-white/[0.08] bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
-            />
-          </label>
+          {mode === "email" ? (
+            <div className="flex flex-col gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-zinc-400">Email</span>
+                <input
+                  type="email"
+                  autoFocus
+                  placeholder="admin@admin.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submit()}
+                  className="w-full rounded-lg border border-white/[0.08] bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-zinc-400">Password</span>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submit()}
+                  className="w-full rounded-lg border border-white/[0.08] bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+                />
+              </label>
+            </div>
+          ) : (
+            <label className="block">
+              <span className="mb-2 block text-xs font-medium text-zinc-400">API Key</span>
+              <input
+                type="password"
+                autoFocus
+                placeholder="••••••••••••••••"
+                value={key}
+                onChange={e => setKey(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()}
+                className="w-full rounded-lg border border-white/[0.08] bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+              />
+            </label>
+          )}
 
           {error && (
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-400">
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="8" cy="8" r="7" />
-                <path d="M8 5v3.5M8 11v.5" strokeLinecap="round" />
+                <circle cx="8" cy="8" r="7" /><path d="M8 5v3.5M8 11v.5" strokeLinecap="round" />
               </svg>
               {error}
             </div>
@@ -340,24 +408,15 @@ function LoginScreen({
 
           <button
             type="button"
-            disabled={!key || loading}
-            onClick={() => onSubmit(key)}
+            disabled={mode === "email" ? (!email || !password || loading) : (!key || loading)}
+            onClick={submit}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-500 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-950/30 transition hover:bg-cyan-400 disabled:opacity-50"
           >
             {loading ? (
-              <>
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-800 border-t-transparent" />
-                Verifying…
-              </>
-            ) : (
-              "Unlock admin"
-            )}
+              <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-800 border-t-transparent" />Verifying…</>
+            ) : "Sign in"}
           </button>
         </div>
-
-        <p className="mt-4 text-center text-xs text-zinc-600">
-          Set <code className="text-zinc-500">ADMIN_API_KEY</code> on the API server
-        </p>
       </div>
     </div>
   );
@@ -373,34 +432,54 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   const [authError, setAuthError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const tryKey = useCallback(async (k: string) => {
-    setAuthError(null);
-    setAuthLoading(true);
-    setAdminKey(k);
+  const verifyAccess = useCallback(async (): Promise<boolean> => {
     try {
       await adminApi.get("/admin/health");
       setAuthed(true);
-      setAuthLoading(false);
       return true;
     } catch {
-      clearAdminKey();
-      setAuthed(false);
-      setAuthLoading(false);
-      setAuthError("Invalid key or server unreachable.");
       return false;
     }
   }, []);
 
+  const handleEmailLogin = useCallback(async (email: string, password: string) => {
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      const res = await adminApi.post<{ apiKey: string }>("/admin/login", { email, password });
+      setAdminKey(res.data.apiKey);
+      await verifyAccess();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setAuthError(typeof msg === 'string' ? msg : "Invalid credentials or not an admin account.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [verifyAccess]);
+
+  const handleKeyLogin = useCallback(async (k: string) => {
+    setAuthError(null);
+    setAuthLoading(true);
+    setAdminKey(k);
+    const ok = await verifyAccess();
+    if (!ok) {
+      clearAdminKey();
+      setAuthError("Invalid key or server unreachable.");
+    }
+    setAuthLoading(false);
+  }, [verifyAccess]);
+
   useEffect(() => {
-    const k = getAdminKey();
-    if (k) {
-      void tryKey(k).then(() => setBoot(false));
+    // Try JWT first, then API key
+    const jwt = getAdminJwt();
+    const key = getAdminKey();
+    if (jwt || key) {
+      void verifyAccess().then(() => setBoot(false));
     } else {
       setBoot(false);
     }
-  }, [tryKey]);
+  }, [verifyAccess]);
 
-  // Close mobile nav on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [path]);
@@ -411,13 +490,20 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   }
 
   if (boot) return <LoadingScreen />;
-  if (!authed) return <LoginScreen onSubmit={tryKey} loading={authLoading} error={authError} />;
+  if (!authed) return (
+    <LoginScreen
+      onEmailLogin={handleEmailLogin}
+      onKeyLogin={handleKeyLogin}
+      loading={authLoading}
+      error={authError}
+    />
+  );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#09090b] text-zinc-100">
+    <div className="flex h-screen overflow-hidden bg-zinc-50 text-zinc-900 dark:bg-[#09090b] dark:text-zinc-100">
 
       {/* ── Desktop sidebar ─────────────────────────────────────────────── */}
-      <aside className="hidden w-56 shrink-0 border-r border-white/[0.06] lg:block">
+      <aside className="hidden w-56 shrink-0 border-r border-zinc-200 bg-white dark:border-white/[0.06] dark:bg-zinc-950 lg:block">
         <Sidebar path={path} onSignOut={signOut} />
       </aside>
 
@@ -430,7 +516,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
       )}
       <aside
         className={cx(
-          "fixed inset-y-0 left-0 z-50 w-64 border-r border-white/[0.06] bg-zinc-950 transition-transform duration-300 ease-in-out lg:hidden",
+          "fixed inset-y-0 left-0 z-50 w-64 border-r border-zinc-200 bg-white transition-transform duration-300 ease-in-out dark:border-white/[0.06] dark:bg-zinc-950 lg:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >

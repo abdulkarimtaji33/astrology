@@ -123,6 +123,48 @@ export class StateListQueryDto extends PaginationQueryDto {
   countryCode?: string;
 }
 
+export class RemindersListQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  userId?: number;
+
+  /** pending | sent | failed */
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  sendDateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  sendDateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  createdFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  createdTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idMax?: number;
+}
+
 export class AiAnalysesListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @Type(() => Number)

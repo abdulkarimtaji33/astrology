@@ -75,24 +75,24 @@ export default function MahadashaPanel({ chartId }: Props) {
     <div className="flex flex-col gap-4">
 
       {/* Header card */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/40">
+      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-white/40">
           Vimshottari Mahadasha
         </p>
         <div className="flex flex-wrap gap-4 text-sm">
           <div>
-            <span className="text-white/40 text-xs">Moon Nakshatra</span>
+            <span className="text-slate-500 dark:text-white/40 text-xs">Moon Nakshatra</span>
             <p className="mt-0.5 font-semibold text-amber-300">{data.moonNakshatra}</p>
           </div>
           <div>
-            <span className="text-white/40 text-xs">Dasha Lord at Birth</span>
+            <span className="text-slate-500 dark:text-white/40 text-xs">Dasha Lord at Birth</span>
             <p className={`mt-0.5 font-semibold ${PLANET_COLOR[data.dashaLordAtBirth]?.text ?? 'text-white'}`}>
               {PLANET_SYMBOL[data.dashaLordAtBirth]} {data.dashaLordAtBirth}
             </p>
           </div>
           {current && (
             <div>
-              <span className="text-white/40 text-xs">Current Mahadasha</span>
+              <span className="text-slate-500 dark:text-white/40 text-xs">Current Mahadasha</span>
               <p className={`mt-0.5 font-semibold ${col.text}`}>
                 {PLANET_SYMBOL[current.planet]} {current.planet}
               </p>
@@ -103,7 +103,7 @@ export default function MahadashaPanel({ chartId }: Props) {
         {/* Progress bar for current dasha */}
         {current && (
           <div className="mt-4">
-            <div className="mb-1.5 flex justify-between text-[11px] text-white/35">
+            <div className="mb-1.5 flex justify-between text-[11px] text-slate-500 dark:text-white/35">
               <span>{current.startDate}</span>
               <span className={col.text}>{pct}% elapsed</span>
               <span>{current.endDate}</span>
@@ -119,8 +119,8 @@ export default function MahadashaPanel({ chartId }: Props) {
       </div>
 
       {/* Timeline */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">
+      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-5">
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-white/40">
           All Periods
         </p>
         <div className="flex flex-col gap-2">
@@ -133,13 +133,13 @@ export default function MahadashaPanel({ chartId }: Props) {
                 className={`rounded-xl border px-4 py-3 ${
                   p.isCurrent
                     ? `${c.border} ${c.bg}`
-                    : 'border-white/8 bg-white/[0.02]'
+                    : 'border-slate-200/80 dark:border-white/8 bg-white/[0.02]'
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className={`text-lg shrink-0 ${c.text}`}>{PLANET_SYMBOL[p.planet]}</span>
-                    <span className={`text-sm font-semibold ${p.isCurrent ? c.text : 'text-white/70'}`}>
+                    <span className={`text-sm font-semibold ${p.isCurrent ? c.text : 'text-slate-700 dark:text-white/70'}`}>
                       {p.planet}
                     </span>
                     {p.isCurrent && (
@@ -148,11 +148,11 @@ export default function MahadashaPanel({ chartId }: Props) {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-white/40 shrink-0">
+                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-white/40 shrink-0">
                     <span className="tabular-nums">{p.startDate}</span>
-                    <span className="text-white/20">→</span>
+                    <span className="text-slate-400 dark:text-white/20">→</span>
                     <span className="tabular-nums">{p.endDate}</span>
-                    <span className="rounded bg-white/5 px-1.5 py-0.5 tabular-nums">{p.years}y</span>
+                    <span className="rounded bg-white/85 dark:bg-white/5 px-1.5 py-0.5 tabular-nums">{p.years}y</span>
                   </div>
                 </div>
                 {pPct !== null && (

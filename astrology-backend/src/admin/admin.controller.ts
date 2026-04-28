@@ -11,8 +11,9 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { IsEmail, IsString } from 'class-validator';
 import { CreateBirthRecordDto } from '../birth-records/dto/create-birth-record.dto';
-import { AdminKeyGuard } from './admin-key.guard';
+import { AdminKeyGuard, SkipAdminGuard } from './admin-key.guard';
 import { AdminService } from './admin.service';
 import {
   AdminAiAnalysisPatchDto,
@@ -20,8 +21,10 @@ import {
   AdminAvasthaWriteDto,
   AdminCityWriteDto,
   AdminCountryWriteDto,
+  AdminCreateReminderDto,
   AdminDrishtiWriteDto,
   AdminHouseWriteDto,
+  AdminPatchReminderDto,
   AdminPhiWriteDto,
   AdminPlanetRelPatchDto,
   AdminPlanetRelationshipWriteDto,
@@ -37,13 +40,28 @@ import {
   BirthRecordsListQueryDto,
   CityListQueryDto,
   CountryListQueryDto,
+  RemindersListQueryDto,
   StateListQueryDto,
 } from './admin-pagination';
+
+class AdminLoginDto {
+  @IsEmail()
+  email: string;
+  @IsString()
+  password: string;
+}
 
 @Controller('admin')
 @UseGuards(AdminKeyGuard)
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
+
+  /** Public — verifies admin credentials, returns the API key */
+  @SkipAdminGuard()
+  @Post('login')
+  adminLogin(@Body() dto: AdminLoginDto) {
+    return this.admin.adminLogin(dto.email, dto.password);
+  }
 
   @Get('health')
   health() {
@@ -79,6 +97,32 @@ export class AdminController {
   @Delete('birth-records/:id')
   removeBirth(@Param('id', ParseIntPipe) id: number) {
     return this.admin.removeBirth(id).then(() => ({ ok: true }));
+  }
+
+  /* transit reminders */
+  @Get('reminders')
+  listReminders(@Query() q: RemindersListQueryDto) {
+    return this.admin.listReminders(q);
+  }
+
+  @Get('reminders/:id')
+  getReminder(@Param('id', ParseIntPipe) id: number) {
+    return this.admin.getReminder(id);
+  }
+
+  @Post('reminders')
+  createReminder(@Body() dto: AdminCreateReminderDto) {
+    return this.admin.createReminder(dto);
+  }
+
+  @Patch('reminders/:id')
+  patchReminder(@Param('id', ParseIntPipe) id: number, @Body() dto: AdminPatchReminderDto) {
+    return this.admin.patchReminder(id, dto);
+  }
+
+  @Delete('reminders/:id')
+  removeReminder(@Param('id', ParseIntPipe) id: number) {
+    return this.admin.removeReminder(id).then(() => ({ ok: true }));
   }
 
   /* ai analyses */

@@ -1,8 +1,18 @@
 -- astrology schema (no data)
 -- Generated 2026-03-16T08:25:38.594Z
 
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UQ_users_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `transit_reminders` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
   `recipientEmail` varchar(255) NOT NULL,
   `sendDate` date NOT NULL,
   `subject` varchar(500) NOT NULL,
@@ -12,11 +22,13 @@ CREATE TABLE IF NOT EXISTS `transit_reminders` (
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
+  KEY `idx_reminders_user` (`user_id`),
   KEY `idx_status_sendDate` (`status`, `sendDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `birth_records` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int DEFAULT NULL,
   `name` varchar(255) NOT NULL,
   `birthDate` date NOT NULL,
   `birthTime` time NOT NULL,

@@ -32,7 +32,7 @@ export interface AiAnalysisResult {
 // ─── Section heading ─────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-3 border-l-2 border-amber-400/50 pl-3 text-xs font-semibold uppercase tracking-widest text-white/40">
+    <h3 className="mb-3 border-l-2 border-amber-500/60 pl-3 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:border-amber-400/50 dark:text-white/40">
       {children}
     </h3>
   );
@@ -43,7 +43,9 @@ function Prose({ text }: { text: string }) {
   return (
     <div className="space-y-2">
       {text.split(/\n+/).filter(Boolean).map((para, i) => (
-        <p key={i} className="text-sm leading-relaxed text-white/80">{para}</p>
+        <p key={i} className="text-sm leading-relaxed text-slate-700 dark:text-white/80">
+          {para}
+        </p>
       ))}
     </div>
   );
@@ -81,8 +83,10 @@ function TransitOverview({ text }: { text: string }) {
     <div className="flex flex-col gap-4">
       {parts.map((p, i) => (
         <div key={i}>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60">{p.label}</p>
-          <p className="text-sm leading-relaxed text-white/80">{p.body}</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-400/60">
+            {p.label}
+          </p>
+          <p className="text-sm leading-relaxed text-slate-700 dark:text-white/80">{p.body}</p>
         </div>
       ))}
     </div>
@@ -94,12 +98,12 @@ function ThemeBlock({ theme }: { theme: ThemeAnalysis | string }) {
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/30">Life Analysis</p>
-        <p className="text-sm leading-relaxed text-white/80">{theme.lifeAnalysis}</p>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/30">Life Analysis</p>
+        <p className="text-sm leading-relaxed text-slate-700 dark:text-white/80">{theme.lifeAnalysis}</p>
       </div>
       <div>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-400/50">Transit Analysis</p>
-        <p className="text-sm leading-relaxed text-white/80">{theme.transitAnalysis}</p>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-400/50">Transit Analysis</p>
+        <p className="text-sm leading-relaxed text-slate-700 dark:text-white/80">{theme.transitAnalysis}</p>
       </div>
     </div>
   );
@@ -139,19 +143,19 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/92 backdrop-blur-sm p-4 sm:p-6">
-      <div className="relative w-full max-w-4xl rounded-3xl border border-white/[0.12] bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl my-6">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-100/90 p-4 backdrop-blur-sm dark:bg-slate-950/92 sm:p-6">
+      <div className="relative my-6 w-full max-w-4xl rounded-3xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50 shadow-2xl dark:border-white/[0.12] dark:from-slate-900 dark:to-slate-950">
 
         {/* Header */}
-        <div className="sticky top-0 z-10 rounded-t-3xl border-b border-white/10 bg-slate-900/95 backdrop-blur-md">
+        <div className="sticky top-0 z-10 rounded-t-3xl border-b border-slate-200/90 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
           <div className="flex items-center justify-between px-6 py-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">AI Astrology Analysis</h2>
-              <p className="text-xs text-white/40 mt-0.5">Transit period: {transitPeriod}</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">AI Astrology Analysis</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-white/40">Transit period: {transitPeriod}</p>
             </div>
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-white/50 transition hover:border-white/30 hover:bg-white/8 hover:text-white/90"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/90 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:border-white/15 dark:text-white/50 dark:hover:border-white/30 dark:hover:bg-white/8 dark:hover:text-white/90"
             >
               ✕
             </button>
@@ -159,7 +163,7 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
 
           {/* Section nav pills — only show when data is loaded */}
           {data && !isLoading && (
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide border-t border-white/8 px-6 py-2.5">
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide border-t border-slate-100 px-6 py-2.5 dark:border-white/8">
               {SECTIONS.map(s => (
                 <button
                   key={s.id}
@@ -168,8 +172,8 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
                   className={[
                     'shrink-0 rounded-full px-4 py-1 text-xs font-medium transition',
                     activeSection === s.id
-                      ? 'border border-amber-400/30 bg-amber-400/15 text-amber-300'
-                      : 'text-white/45 hover:bg-white/8 hover:text-white/80',
+                      ? 'border border-amber-400/60 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-300'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-white/45 dark:hover:bg-white/8 dark:hover:text-white/80',
                   ].join(' ')}
                 >
                   {s.label}
@@ -183,14 +187,14 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
         {isLoading && (
           <div className="flex flex-col items-center justify-center gap-4 py-32 px-6">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-amber-400 border-t-transparent shadow-[0_0_24px_rgba(251,191,36,0.3)]" />
-            <p className="text-sm text-white/50">Consulting the stars… this may take 15–30 seconds</p>
+            <p className="text-sm text-slate-600 dark:text-white/50">Consulting the stars… this may take 15–30 seconds</p>
           </div>
         )}
 
         {/* Error */}
         {isError && !isLoading && (
           <div className="p-6">
-            <p className="rounded-xl bg-red-500/20 p-4 text-sm text-red-200">
+            <p className="rounded-xl bg-red-100 p-4 text-sm text-red-900 dark:bg-red-500/20 dark:text-red-200">
               Failed to get AI analysis. Please check that the OpenAI API key is configured and try again.
             </p>
           </div>
@@ -209,7 +213,7 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
             {/* ── Personal ── */}
             <div id="ai-personal" className="scroll-mt-32 flex flex-col gap-4">
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] p-5">
+                <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-5 dark:border-white/[0.12] dark:from-white/[0.07] dark:to-white/[0.03]">
                   <SectionTitle>Personality &amp; Character</SectionTitle>
                   <ThemeBlock theme={data.personality} />
                 </div>
@@ -219,7 +223,7 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
                 </div>
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-white/[0.12] bg-gradient-to-b from-white/[0.07] to-white/[0.03] p-5">
+                <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-5 dark:border-white/[0.12] dark:from-white/[0.07] dark:to-white/[0.03]">
                   <SectionTitle>Family Life</SectionTitle>
                   <ThemeBlock theme={data.familyLife} />
                 </div>
@@ -233,7 +237,7 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
                   <SectionTitle>Strong Areas</SectionTitle>
                   <ul className="space-y-2">
                     {data.strongAreas?.map((area, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-white/80">
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700 dark:text-white/80">
                         <span className="mt-0.5 shrink-0 text-emerald-400">✦</span>
                         {area}
                       </li>
@@ -244,7 +248,7 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
                   <SectionTitle>Areas Needing Attention</SectionTitle>
                   <ul className="space-y-2">
                     {data.weakAreas?.map((area, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-white/80">
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700 dark:text-white/80">
                         <span className="mt-0.5 shrink-0 text-red-400">◈</span>
                         {area}
                       </li>
@@ -262,10 +266,12 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
                   {data.recommendedGemstones?.map((g, i) => (
                     <div key={i} className="rounded-xl border border-amber-400/20 bg-amber-400/8 p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-amber-300">{g.name}</span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">{g.planet}</span>
+                        <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">{g.name}</span>
+                        <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-white/10 dark:text-white/50">
+                          {g.planet}
+                        </span>
                       </div>
-                      <p className="text-xs text-white/60 leading-relaxed">{g.reason}</p>
+                      <p className="text-xs leading-relaxed text-slate-600 dark:text-white/60">{g.reason}</p>
                     </div>
                   ))}
                 </div>
@@ -276,10 +282,12 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
                   {data.gemstonesToAvoid?.map((g, i) => (
                     <div key={i} className="rounded-xl border border-red-400/20 bg-red-400/8 p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-red-300">{g.name}</span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/50">{g.planet}</span>
+                        <span className="text-sm font-semibold text-red-800 dark:text-red-300">{g.name}</span>
+                        <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-white/10 dark:text-white/50">
+                          {g.planet}
+                        </span>
                       </div>
-                      <p className="text-xs text-white/60 leading-relaxed">{g.reason}</p>
+                      <p className="text-xs leading-relaxed text-slate-600 dark:text-white/60">{g.reason}</p>
                     </div>
                   ))}
                 </div>
@@ -289,11 +297,11 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
             {/* ── Transits ── */}
             <div id="ai-transits" className="scroll-mt-32 flex flex-col gap-4">
               <div className="flex items-center gap-4">
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
                 <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-1 text-xs font-semibold text-cyan-300">
                   Transit Period: {data.transitPeriod}
                 </span>
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
               </div>
               <div className="rounded-2xl border border-cyan-400/20 bg-gradient-to-b from-cyan-400/8 to-cyan-400/3 p-5">
                 <SectionTitle>Transit Overview</SectionTitle>
@@ -311,7 +319,7 @@ export default function AiAnalysisModal({ isOpen, isLoading, isError, data, tran
             <div className="flex justify-center pt-2">
               <button
                 onClick={onClose}
-                className="rounded-xl border border-white/15 px-8 py-2.5 text-sm text-white/60 transition hover:bg-white/8 hover:text-white/90"
+                className="rounded-xl border border-slate-300/90 px-8 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-white/15 dark:text-white/60 dark:hover:bg-white/8 dark:hover:text-white/90"
               >
                 Close
               </button>

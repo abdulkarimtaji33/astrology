@@ -28,8 +28,8 @@ const PLANET_COLOR: Record<string, string> = {
 const REL_STYLE: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   friendly: { bg: 'bg-emerald-500/15 border-emerald-500/30', text: 'text-emerald-300', dot: 'bg-emerald-400', label: 'Friend' },
   enemy:    { bg: 'bg-red-500/15 border-red-500/30',         text: 'text-red-300',     dot: 'bg-red-400',     label: 'Enemy'  },
-  neutral:  { bg: 'bg-white/5 border-white/10',              text: 'text-white/40',    dot: 'bg-white/20',    label: 'Neutral'},
-  self:     { bg: 'bg-white/5 border-white/5',               text: 'text-white/20',    dot: 'bg-white/10',    label: '—'      },
+  neutral:  { bg: 'bg-white/85 dark:bg-white/5 border-slate-200/90 dark:border-white/10',              text: 'text-slate-500 dark:text-white/40',    dot: 'bg-white/20',    label: 'Neutral'},
+  self:     { bg: 'bg-white/85 dark:bg-white/5 border-slate-200/70 dark:border-white/5',               text: 'text-slate-400 dark:text-white/20',    dot: 'bg-white/10',    label: '—'      },
 };
 
 function RelCell({ rel, isSelf }: { rel: 'friendly' | 'enemy' | 'neutral'; isSelf: boolean }) {
@@ -74,8 +74,8 @@ export default function PlanetRelationshipsPanel() {
     <div className="flex flex-col gap-8">
 
       {/* ── Matrix ── */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 overflow-x-auto">
-        <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">
+      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-5 overflow-x-auto">
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-white/40">
           Naisargika Maitri · Natural Friendship Matrix
         </h3>
 
@@ -88,7 +88,7 @@ export default function PlanetRelationshipsPanel() {
           {planets.map(p => (
             <div key={p} className="flex flex-col items-center gap-0.5 pb-2">
               <span className={`text-lg ${PLANET_COLOR[p] ?? 'text-white'}`}>{PLANET_SYMBOL[p] ?? p[0]}</span>
-              <span className="text-[10px] text-white/50">{p}</span>
+              <span className="text-[10px] text-slate-500 dark:text-white/50">{p}</span>
             </div>
           ))}
 
@@ -98,7 +98,7 @@ export default function PlanetRelationshipsPanel() {
               {/* Row label */}
               <div key={`label-${row}`} className="flex items-center gap-2 pr-2">
                 <span className={`text-base ${PLANET_COLOR[row] ?? 'text-white'}`}>{PLANET_SYMBOL[row] ?? row[0]}</span>
-                <span className="text-xs text-white/70">{row}</span>
+                <span className="text-xs text-slate-700 dark:text-white/70">{row}</span>
               </div>
 
               {/* Cells */}
@@ -118,7 +118,7 @@ export default function PlanetRelationshipsPanel() {
           {(['friendly', 'enemy', 'neutral'] as const).map(r => (
             <div key={r} className="flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-full ${REL_STYLE[r].dot}`} />
-              <span className="text-xs text-white/50 capitalize">{REL_STYLE[r].label}</span>
+              <span className="text-xs text-slate-500 dark:text-white/50 capitalize">{REL_STYLE[r].label}</span>
             </div>
           ))}
         </div>
@@ -127,7 +127,7 @@ export default function PlanetRelationshipsPanel() {
       {/* ── Summary cards ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {summaries.map(({ planet, friends, enemies, neutrals }) => (
-          <div key={planet} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div key={planet} className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-4">
             <div className="mb-3 flex items-center gap-2">
               <span className={`text-2xl ${PLANET_COLOR[planet] ?? 'text-white'}`}>{PLANET_SYMBOL[planet]}</span>
               <span className="text-sm font-semibold text-white">{planet}</span>
@@ -161,10 +161,10 @@ export default function PlanetRelationshipsPanel() {
 
             {neutrals.length > 0 && (
               <div>
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/30">Neutral</p>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-white/30">Neutral</p>
                 <div className="flex flex-wrap gap-1">
                   {neutrals.map(n => (
-                    <span key={n} className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[11px] text-white/40">
+                    <span key={n} className="flex items-center gap-1 rounded-full bg-white/85 dark:bg-white/5 border border-slate-200/90 dark:border-white/10 px-2 py-0.5 text-[11px] text-slate-500 dark:text-white/40">
                       <span>{PLANET_SYMBOL[n]}</span> {n}
                     </span>
                   ))}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
@@ -25,12 +26,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex min-h-screen flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased flex flex-col`}
       >
-        <AppNav />
-        <Providers>{children}</Providers>
+        <Providers>
+          <Link href="#main-content" className="skip-link">
+            Skip to content
+          </Link>
+          <AppNav />
+          <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

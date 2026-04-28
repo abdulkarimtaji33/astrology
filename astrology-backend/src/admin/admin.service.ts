@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { Brackets, In, Repository } from 'typeorm';
+import { User } from '../auth/user.entity';
 import { BirthRecord } from '../birth-records/birth-record.entity';
 import { AiAnalysis } from '../birth-records/ai-analysis.entity';
 import { City } from '../cities/city.entity';
@@ -16,6 +18,7 @@ import { GeoRegion } from '../entities/region.entity';
 import { Subregion } from '../entities/subregion.entity';
 import { Country } from '../entities/country.entity';
 import { State } from '../entities/state.entity';
+import { TransitReminder } from '../reminders/transit-reminder.entity';
 import {
   AiAnalysesListQueryDto,
   BirthRecordsListQueryDto,
@@ -23,6 +26,7 @@ import {
   CountryListQueryDto,
   getSkipTake,
   ListResult,
+  RemindersListQueryDto,
   StateListQueryDto,
   toListResult,
 } from './admin-pagination';
@@ -32,8 +36,10 @@ import {
   AdminAvasthaWriteDto,
   AdminCityWriteDto,
   AdminCountryWriteDto,
+  AdminCreateReminderDto,
   AdminDrishtiWriteDto,
   AdminHouseWriteDto,
+  AdminPatchReminderDto,
   AdminPhiWriteDto,
   AdminPlanetRelPatchDto,
   AdminPlanetRelationshipWriteDto,
@@ -62,7 +68,20 @@ export class AdminService {
     @InjectRepository(Subregion) private readonly subregion: Repository<Subregion>,
     @InjectRepository(Country) private readonly country: Repository<Country>,
     @InjectRepository(State) private readonly state: Repository<State>,
+    @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(TransitReminder) private readonly reminders: Repository<TransitReminder>,
   ) {}
+
+  async adminLogin(email: string, password: string): Promise<{ apiKey: string }> {
+    const user = await this.users.findOne({ where: { email: email.toLowerCase() } });
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    if (!user.isAdmin) throw new UnauthorizedException('Not an admin account');
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) throw new UnauthorizedException('Admin API key not configured on server');
+    return { apiKey };
+  }
 
   async health(): Promise<{ ok: boolean }> {
     return { ok: true };
@@ -164,6 +183,121 @@ export class AdminService {
 
   async removeBirth(id: number) {
     const r = await this.birth.delete({ id });
+    if (!r.affected) throw new NotFoundException();
+  }
+
+  /* --- transit reminders --- */
+  async listReminders(dto: RemindersListQueryDto): Promise<
+    ListResult<{
+      id: number;
+      userId: number;
+      ownerEmail: string | null;
+      recipientEmail: string;
+      sendDate: string;
+      subject: string;
+      placementDetails: string;
+      note: string | null;
+      status: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  > {
+    const { skip, take, page, limit } = getSkipTake(dto.page ?? 1, dto.limit ?? 20);
+    const qb = this.reminders.createQueryBuilder('r');
+    const q = (dto.q ?? '').trim();
+    if (q) {
+      const like = `%${q}%`;
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('r.subject LIKE :like', { like })
+            .orWhere('r.recipientEmail LIKE :like', { like })
+            .orWhere('r.placementDetails LIKE :like', { like })
+            .orWhere('CAST(r.id AS CHAR) LIKE :like', { like });
+        }),
+      );
+    }
+    if (dto.userId != null) qb.andWhere('r.userId = :uid', { uid: dto.userId });
+    if (dto.status?.trim()) qb.andWhere('r.status = :st', { st: dto.status.trim() });
+    if (dto.sendDateFrom) qb.andWhere('r.sendDate >= :sdf', { sdf: dto.sendDateFrom });
+    if (dto.sendDateTo) qb.andWhere('r.sendDate <= :sdt', { sdt: dto.sendDateTo });
+    if (dto.createdFrom) qb.andWhere('r.createdAt >= :cdf', { cdf: `${dto.createdFrom} 00:00:00` });
+    if (dto.createdTo) qb.andWhere('r.createdAt <= :cdt', { cdt: `${dto.createdTo} 23:59:59.999` });
+    if (dto.idMin != null) qb.andWhere('r.id >= :idmin', { idmin: dto.idMin });
+    if (dto.idMax != null) qb.andWhere('r.id <= :idmax', { idmax: dto.idMax });
+    qb.orderBy('r.sendDate', 'DESC').addOrderBy('r.id', 'DESC').skip(skip).take(take);
+    const [rows, total] = await qb.getManyAndCount();
+    const userIds = [...new Set(rows.map((r) => r.userId))];
+    const owners = userIds.length === 0 ? [] : await this.users.findBy({ id: In(userIds) });
+    const emailById = new Map(owners.map((u) => [u.id, u.email]));
+    const items = rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      ownerEmail: emailById.get(r.userId) ?? null,
+      recipientEmail: r.recipientEmail,
+      sendDate: r.sendDate,
+      subject: r.subject,
+      placementDetails: r.placementDetails,
+      note: r.note,
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }));
+    return toListResult(items, total, page, limit);
+  }
+
+  async getReminder(id: number) {
+    const row = await this.reminders.findOneBy({ id });
+    if (!row) throw new NotFoundException('Reminder not found');
+    const owner = await this.users.findOneBy({ id: row.userId });
+    return {
+      id: row.id,
+      userId: row.userId,
+      ownerEmail: owner?.email ?? null,
+      recipientEmail: row.recipientEmail,
+      sendDate: row.sendDate,
+      subject: row.subject,
+      placementDetails: row.placementDetails,
+      note: row.note,
+      status: row.status,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async createReminder(dto: AdminCreateReminderDto) {
+    const u = await this.users.findOneBy({ id: dto.userId });
+    if (!u) throw new NotFoundException('User not found');
+    const e = this.reminders.create({
+      userId: dto.userId,
+      recipientEmail: dto.recipientEmail.trim().toLowerCase(),
+      sendDate: dto.sendDate,
+      subject: dto.subject,
+      placementDetails: dto.placementDetails,
+      note: dto.note ?? null,
+      status: dto.status ?? 'pending',
+    });
+    return this.reminders.save(e);
+  }
+
+  async patchReminder(id: number, dto: AdminPatchReminderDto) {
+    const row = await this.reminders.findOneBy({ id });
+    if (!row) throw new NotFoundException('Reminder not found');
+    if (dto.userId != null) {
+      const u = await this.users.findOneBy({ id: dto.userId });
+      if (!u) throw new NotFoundException('User not found');
+      row.userId = dto.userId;
+    }
+    if (dto.recipientEmail !== undefined) row.recipientEmail = dto.recipientEmail.trim().toLowerCase();
+    if (dto.sendDate !== undefined) row.sendDate = dto.sendDate;
+    if (dto.subject !== undefined) row.subject = dto.subject;
+    if (dto.placementDetails !== undefined) row.placementDetails = dto.placementDetails;
+    if (dto.note !== undefined) row.note = dto.note === '' ? null : dto.note;
+    if (dto.status !== undefined) row.status = dto.status;
+    return this.reminders.save(row);
+  }
+
+  async removeReminder(id: number) {
+    const r = await this.reminders.delete({ id });
     if (!r.affected) throw new NotFoundException();
   }
 

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
@@ -160,9 +160,10 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
-  async create(dto: CreateBirthRecordDto): Promise<BirthRecord> {
-    this.logger.log(`create: name=${dto.name} birthDate=${dto.birthDate}`);
+  async create(dto: CreateBirthRecordDto, userId: number): Promise<BirthRecord> {
+    this.logger.log(`create: name=${dto.name} birthDate=${dto.birthDate} userId=${userId}`);
     const record = this.repo.create({
+      userId,
       name: dto.name,
       birthDate: new Date(dto.birthDate),
       birthTime: dto.birthTime.length === 5 ? `${dto.birthTime}:00` : dto.birthTime,
@@ -176,7 +177,20 @@ export class BirthRecordsService implements OnModuleInit {
     return saved;
   }
 
-  async getSummary(id: number): Promise<{
+  async listMine(userId: number): Promise<
+    Pick<BirthRecord, 'id' | 'name' | 'birthDate' | 'cityName' | 'createdAt'>[]
+  > {
+    return this.repo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      select: { id: true, name: true, birthDate: true, cityName: true, createdAt: true },
+    });
+  }
+
+  async getSummary(
+    id: number,
+    userId: number,
+  ): Promise<{
     id: number;
     name: string;
     birthDate: string;
@@ -185,7 +199,7 @@ export class BirthRecordsService implements OnModuleInit {
     timezone: string | null;
   }> {
     this.logger.log(`getSummary: id=${id}`);
-    const r = await this.loadRecord(id);
+    const r = await this.assertAccess(id, userId);
     const birthDate =
       r.birthDate instanceof Date
         ? r.birthDate.toISOString().slice(0, 10)
@@ -202,12 +216,15 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   // ── private helpers ───────────────────────────────────────────────────────
-  private async loadRecord(id: number): Promise<BirthRecord> {
-    this.logger.debug(`loadRecord: id=${id}`);
+  private async assertAccess(id: number, userId: number): Promise<BirthRecord> {
+    this.logger.debug(`assertAccess: id=${id} userId=${userId}`);
     const record = await this.repo.findOne({ where: { id } });
     if (!record) {
-      this.logger.warn(`loadRecord: not found id=${id}`);
+      this.logger.warn(`assertAccess: not found id=${id}`);
       throw new NotFoundException(`Birth record ${id} not found`);
+    }
+    if (record.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this chart');
     }
     return record;
   }
@@ -391,9 +408,9 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   // ── public chart methods ──────────────────────────────────────────────────
-  async getChart(id: number): Promise<EnrichedChart> {
+  async getChart(id: number, userId: number): Promise<EnrichedChart> {
     this.logger.log(`getChart: start id=${id}`);
-    const record = await this.loadRecord(id);
+    const record = await this.assertAccess(id, userId);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
     const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
@@ -409,9 +426,9 @@ export class BirthRecordsService implements OnModuleInit {
     return { ...chart, planets, houseDetails };
   }
 
-  async getMoonChart(id: number): Promise<EnrichedChart> {
+  async getMoonChart(id: number, userId: number): Promise<EnrichedChart> {
     this.logger.log(`getMoonChart: start id=${id}`);
-    const record = await this.loadRecord(id);
+    const record = await this.assertAccess(id, userId);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
     const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
@@ -462,11 +479,17 @@ export class BirthRecordsService implements OnModuleInit {
   }
 
   /** Transit houses are always whole-sign from the natal Moon sign (Chandra Lagna). */
-  async getTransits(id: number, from: string, to: string, basis: 'lagna' | 'moon' = 'lagna'): Promise<TransitResponse> {
+  async getTransits(
+    id: number,
+    from: string,
+    to: string,
+    userId: number,
+    basis: 'lagna' | 'moon' = 'lagna',
+  ): Promise<TransitResponse> {
     this.logger.log(`getTransits: start id=${id} from=${from} to=${to} basis=${basis}`);
     if (!from || !to) throw new BadRequestException('Query params "from" and "to" (YYYY-MM-DD) are required');
 
-    const record = await this.loadRecord(id);
+    const record = await this.assertAccess(id, userId);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
     const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
@@ -557,18 +580,18 @@ export class BirthRecordsService implements OnModuleInit {
     };
   }
 
-  async getNumerology(id: number, targetYear?: number): Promise<NumerologyResult> {
+  async getNumerology(id: number, userId: number, targetYear?: number): Promise<NumerologyResult> {
     this.logger.log(`getNumerology: id=${id} targetYear=${targetYear ?? 'default'}`);
-    const record = await this.loadRecord(id);
+    const record = await this.assertAccess(id, userId);
     const [year, month, day] = this.parseBirthDate(record);
     const n = calculateNumerology(day, month, year, targetYear, record.name ?? '');
     this.logger.debug(`getNumerology: done driver=${n.driverNumber}`);
     return n;
   }
 
-  async getMahadasha(id: number): Promise<MahadashaResult> {
+  async getMahadasha(id: number, userId: number): Promise<MahadashaResult> {
     this.logger.log(`getMahadasha: id=${id}`);
-    const record = await this.loadRecord(id);
+    const record = await this.assertAccess(id, userId);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
     const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
@@ -583,9 +606,9 @@ export class BirthRecordsService implements OnModuleInit {
     return md;
   }
 
-  async getSaturnTransits(id: number): Promise<SaturnTransitResult> {
+  async getSaturnTransits(id: number, userId: number): Promise<SaturnTransitResult> {
     this.logger.log(`getSaturnTransits: id=${id}`);
-    const record = await this.loadRecord(id);
+    const record = await this.assertAccess(id, userId);
     const [year, month, day] = this.parseBirthDate(record);
     const [hour, minute, second] = this.parseBirthTime(record);
     const lat = record.latitude  ? Number(record.latitude)  : 20.5937;
@@ -913,6 +936,7 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     id: number,
     from: string,
     to: string,
+    userId: number,
     targetYear?: number,
     basis: 'lagna' | 'moon' = 'lagna',
   ): Promise<AiAnalysisResult> {
@@ -921,14 +945,14 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
 
     this.logger.log('getAiAnalysis: parallel load chart, moon, transits, numerology, record, ref, mahadasha, saturn, ai-knowledge');
     const [lagnaChart, moonChart, transitData, numerology, record, ref, mahadasha, saturnTransits, knowledge] = await Promise.all([
-      this.getChart(id),
-      this.getMoonChart(id),
-      this.getTransits(id, from, to, basis),
-      this.getNumerology(id, targetYear),
-      this.loadRecord(id),
+      this.getChart(id, userId),
+      this.getMoonChart(id, userId),
+      this.getTransits(id, from, to, userId, basis),
+      this.getNumerology(id, userId, targetYear),
+      this.assertAccess(id, userId),
       this.loadRefData(),
-      this.getMahadasha(id),
-      this.getSaturnTransits(id),
+      this.getMahadasha(id, userId),
+      this.getSaturnTransits(id, userId),
       this.getAiKnowledgeText(),
     ]);
     this.logger.log(
@@ -1001,13 +1025,14 @@ Return ONLY a valid JSON object (no markdown fences, no text outside JSON):
     id: number,
     house: number,
     chartKind: 'lagna' | 'moon',
+    userId: number,
   ): Promise<HouseAiResult> {
     if (house < 1 || house > 12) throw new BadRequestException('house must be 1–12');
     this.logger.log(`getHouseAiAnalysis: id=${id} house=${house} chart=${chartKind}`);
 
     const [chart, record, knowledge] = await Promise.all([
-      chartKind === 'moon' ? this.getMoonChart(id) : this.getChart(id),
-      this.loadRecord(id),
+      chartKind === 'moon' ? this.getMoonChart(id, userId) : this.getChart(id, userId),
+      this.assertAccess(id, userId),
       this.getAiKnowledgeText(),
     ]);
     const detail = chart.houseDetails.find(hd => hd.house === house);
@@ -1124,8 +1149,9 @@ Return ONLY valid JSON (no markdown):
     return { planets, relationships };
   }
 
-  async listAiAnalyses(birthRecordId: number): Promise<AiAnalysis[]> {
+  async listAiAnalyses(birthRecordId: number, userId: number): Promise<AiAnalysis[]> {
     this.logger.log(`listAiAnalyses: birthRecordId=${birthRecordId}`);
+    await this.assertAccess(birthRecordId, userId);
     return this.aiRepo.find({
       where: { birthRecordId },
       order: { createdAt: 'DESC' },
@@ -1133,8 +1159,9 @@ Return ONLY valid JSON (no markdown):
     });
   }
 
-  async getAiAnalysisById(birthRecordId: number, analysisId: number): Promise<AiAnalysisResult> {
+  async getAiAnalysisById(birthRecordId: number, analysisId: number, userId: number): Promise<AiAnalysisResult> {
     this.logger.log(`getAiAnalysisById: birthRecordId=${birthRecordId} analysisId=${analysisId}`);
+    await this.assertAccess(birthRecordId, userId);
     const row = await this.aiRepo.findOne({ where: { id: analysisId, birthRecordId } });
     if (!row) {
       this.logger.warn(`getAiAnalysisById: not found analysisId=${analysisId}`);
