@@ -20,6 +20,21 @@ interface PlanetPosition {
   avastha?: PlanetAvastha | null;
 }
 
+const SIGN_ELEMENT: Record<string, { label: string; cls: string }> = {
+  Aries:       { label: 'Fire',  cls: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400' },
+  Leo:         { label: 'Fire',  cls: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400' },
+  Sagittarius: { label: 'Fire',  cls: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400' },
+  Taurus:      { label: 'Earth', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' },
+  Virgo:       { label: 'Earth', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' },
+  Capricorn:   { label: 'Earth', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' },
+  Gemini:      { label: 'Air',   cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' },
+  Libra:       { label: 'Air',   cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' },
+  Aquarius:    { label: 'Air',   cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' },
+  Cancer:      { label: 'Water', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
+  Scorpio:     { label: 'Water', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
+  Pisces:      { label: 'Water', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
+};
+
 const DIGNITY_BADGE: Record<string, string> = {
   own: 'bg-amber-200/80 text-amber-900 dark:bg-amber-400/20 dark:text-amber-300',
   exalted: 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-400/20 dark:text-emerald-300',
@@ -68,7 +83,16 @@ export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) 
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-indigo-800 dark:text-indigo-300">{p.sign}</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-indigo-800 dark:text-indigo-300">{p.sign}</span>
+                    {SIGN_ELEMENT[p.sign] && (
+                      <span className={`inline-block w-fit rounded px-1.5 py-0 text-[10px] font-medium ${SIGN_ELEMENT[p.sign].cls}`}>
+                        {SIGN_ELEMENT[p.sign].label}
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-3 py-2.5 tabular-nums text-slate-600 dark:text-white/60">
                   {p.degreeInSign.toFixed(2)}°
                 </td>

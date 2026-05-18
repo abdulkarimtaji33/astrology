@@ -80,6 +80,21 @@ const PLANET_SYMBOL: Record<string, string> = {
   Mars:'♂', Jupiter:'♃', Saturn:'♄', Rahu:'☊', Ketu:'☋',
 };
 
+const SIGN_ELEMENT: Record<string, { label: string; cls: string }> = {
+  Aries:       { label: 'Fire',  cls: 'bg-red-500/15 text-red-400' },
+  Leo:         { label: 'Fire',  cls: 'bg-red-500/15 text-red-400' },
+  Sagittarius: { label: 'Fire',  cls: 'bg-red-500/15 text-red-400' },
+  Taurus:      { label: 'Earth', cls: 'bg-emerald-500/15 text-emerald-400' },
+  Virgo:       { label: 'Earth', cls: 'bg-emerald-500/15 text-emerald-400' },
+  Capricorn:   { label: 'Earth', cls: 'bg-emerald-500/15 text-emerald-400' },
+  Gemini:      { label: 'Air',   cls: 'bg-sky-500/15 text-sky-400' },
+  Libra:       { label: 'Air',   cls: 'bg-sky-500/15 text-sky-400' },
+  Aquarius:    { label: 'Air',   cls: 'bg-sky-500/15 text-sky-400' },
+  Cancer:      { label: 'Water', cls: 'bg-blue-500/15 text-blue-400' },
+  Scorpio:     { label: 'Water', cls: 'bg-blue-500/15 text-blue-400' },
+  Pisces:      { label: 'Water', cls: 'bg-blue-500/15 text-blue-400' },
+};
+
 const DIGNITY_BADGE: Record<string, string> = {
   own:         'bg-amber-400/20 text-amber-300',
   exalted:     'bg-emerald-400/20 text-emerald-300',
@@ -167,6 +182,11 @@ function TransitTable({
                           {tp.degreeInSign.toFixed(1)}°
                         </span>
                       </span>
+                      {SIGN_ELEMENT[tp.sign] && (
+                        <span className={`inline-block w-fit rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[tp.sign].cls}`}>
+                          {SIGN_ELEMENT[tp.sign].label}
+                        </span>
+                      )}
                       {hi?.signLord && (
                         <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>
                       )}
@@ -195,9 +215,19 @@ function TransitTable({
                       </p>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
+                  <td className="px-3 py-3 tabular-nums">
                     {natal ? (
-                      <span>{natal.sign} <span className="text-xs text-slate-500 dark:text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-indigo-300/60">
+                          {natal.sign}{' '}
+                          <span className="text-xs text-slate-500 dark:text-white/30">{natal.degreeInSign.toFixed(1)}°</span>
+                        </span>
+                        {SIGN_ELEMENT[natal.sign] && (
+                          <span className={`inline-block w-fit rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[natal.sign].cls}`}>
+                            {SIGN_ELEMENT[natal.sign].label}
+                          </span>
+                        )}
+                      </div>
                     ) : '—'}
                   </td>
                   <td className="px-3 py-3 tabular-nums text-slate-600 dark:text-white/40">
@@ -1071,6 +1101,11 @@ function HouseView({
                             <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>{tp.sign}</span>
                             <span className="ml-2 text-xs tabular-nums text-slate-600 dark:text-white/40">{tp.degreeInSign.toFixed(1)}°</span>
                           </span>
+                          {SIGN_ELEMENT[tp.sign] && (
+                            <span className={`inline-block w-fit rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[tp.sign].cls}`}>
+                              {SIGN_ELEMENT[tp.sign].label}
+                            </span>
+                          )}
                           {hi?.signLord && <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>}
                         </div>
                       </td>
@@ -1402,6 +1437,11 @@ export default function TransitPanel({ chartId, natalLagna, accountEmail }: Prop
                                   {p.degreeInSign.toFixed(1)}°
                                 </span>
                               </p>
+                              {SIGN_ELEMENT[p.sign] && (
+                                <span className={`inline-block rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[p.sign].cls}`}>
+                                  {SIGN_ELEMENT[p.sign].label} element
+                                </span>
+                              )}
                               {hi?.signLord && (
                                 <p className="mt-0.5 text-[11px] text-cyan-300/85">
                                   Lord {lordSym} {hi.signLord}

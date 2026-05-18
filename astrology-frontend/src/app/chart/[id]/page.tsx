@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -60,6 +60,176 @@ export interface ChartData {
 type ChartTab  = 'lagna' | 'moon' | 'transit' | 'numerology' | 'relationships' | 'saturn';
 type TableView = 'houses' | 'planets';
 
+const SIGN_ELEMENT: Record<string, { label: string; cls: string }> = {
+  Aries:       { label: 'Fire element',  cls: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' },
+  Leo:         { label: 'Fire element',  cls: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' },
+  Sagittarius: { label: 'Fire element',  cls: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' },
+  Taurus:      { label: 'Earth element', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' },
+  Virgo:       { label: 'Earth element', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' },
+  Capricorn:   { label: 'Earth element', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' },
+  Gemini:      { label: 'Air element',   cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' },
+  Libra:       { label: 'Air element',   cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' },
+  Aquarius:    { label: 'Air element',   cls: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' },
+  Cancer:      { label: 'Water element', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' },
+  Scorpio:     { label: 'Water element', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' },
+  Pisces:      { label: 'Water element', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' },
+};
+
+// ─── Edit birth date/time modal ────────────────────────────────────────────
+function EditBirthModal({
+  chartId,
+  initialDate,
+  initialTime,
+  onClose,
+  onSaved,
+}: {
+  chartId: string;
+  initialDate: string;
+  initialTime: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [date, setDate] = useState(initialDate);
+  const [time, setTime] = useState(initialTime.slice(0, 5));
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('loading');
+    try {
+      await api.patch(`/birth-records/${chartId}`, { birthDate: date, birthTime: time });
+      onSaved();
+      onClose();
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200/90 bg-white shadow-2xl dark:border-white/[0.12] dark:bg-[#0f0f1a]">
+        <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4 dark:border-white/8">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white/90">Edit Birth Date & Time</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-white/30 dark:hover:text-white/70 text-lg leading-none p-1">✕</button>
+        </div>
+        <form onSubmit={submit} className="flex flex-col gap-4 px-5 py-5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-white/40">Birth Date</label>
+            <input
+              type="date"
+              required
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-900 dark:text-white/90 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400/30 [color-scheme:light] dark:[color-scheme:dark]"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-white/40">Birth Time</label>
+            <input
+              type="time"
+              required
+              value={time}
+              onChange={e => setTime(e.target.value)}
+              className="rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-900 dark:text-white/90 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400/30 [color-scheme:light] dark:[color-scheme:dark]"
+            />
+          </div>
+          {status === 'error' && (
+            <p className="text-[11px] text-red-500 dark:text-red-400">Failed to update. Please try again.</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={status === 'loading'}
+              className="flex-1 rounded-xl border border-amber-500/50 bg-amber-500 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 dark:border-amber-400/50 dark:bg-amber-400 dark:text-slate-900 dark:hover:bg-amber-300"
+            >
+              {status === 'loading' ? 'Saving…' : 'Save Changes'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200/90 dark:border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-600 dark:text-white/40 hover:bg-slate-50 dark:hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete confirm modal ──────────────────────────────────────────────────
+function DeleteConfirmModal({
+  chartId,
+  chartName,
+  onClose,
+  onDeleted,
+}: {
+  chartId: string;
+  chartName: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const confirm = async () => {
+    setStatus('loading');
+    try {
+      await api.delete(`/birth-records/${chartId}`);
+      onDeleted();
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-red-300/40 bg-white shadow-2xl dark:border-red-400/20 dark:bg-[#0f0f1a]">
+        <div className="px-6 py-6 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-2xl dark:bg-red-500/15">🗑</div>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white/90">Delete Chart?</h3>
+          <p className="mt-2 text-sm text-slate-600 dark:text-white/50">
+            <span className="font-medium text-slate-800 dark:text-white/80">{chartName}</span> will be permanently deleted.
+            This cannot be undone.
+          </p>
+          {status === 'error' && (
+            <p className="mt-3 text-[11px] text-red-500 dark:text-red-400">Failed to delete. Please try again.</p>
+          )}
+          <div className="mt-5 flex gap-2">
+            <button
+              type="button"
+              onClick={confirm}
+              disabled={status === 'loading'}
+              className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-400"
+            >
+              {status === 'loading' ? 'Deleting…' : 'Yes, delete'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-200/90 dark:border-white/10 py-2.5 text-sm text-slate-600 dark:text-white/40 hover:bg-slate-50 dark:hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shared chart + table layout ───────────────────────────────────────────
 function ChartSection({
   chart,
@@ -86,12 +256,19 @@ function ChartSection({
           <p className="border-l-2 border-amber-500/60 pl-2 text-xs font-medium uppercase tracking-widest text-slate-500 dark:border-amber-400/50 dark:text-white/40">
             {lagnaLabel}
           </p>
-          <p className="mt-2 text-lg font-semibold text-amber-700 dark:text-amber-300">
-            {chart.lagna.sign}
-            <span className="ml-2 text-sm font-normal text-slate-600 dark:text-white/60">
-              {chart.lagna.degreeInSign.toFixed(2)}°
-            </span>
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="text-lg font-semibold text-amber-700 dark:text-amber-300">
+              {chart.lagna.sign}
+              <span className="ml-2 text-sm font-normal text-slate-600 dark:text-white/60">
+                {chart.lagna.degreeInSign.toFixed(2)}°
+              </span>
+            </p>
+            {SIGN_ELEMENT[chart.lagna.sign] && (
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${SIGN_ELEMENT[chart.lagna.sign].cls}`}>
+                {SIGN_ELEMENT[chart.lagna.sign].label}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-white/40">
             {lagnaSubLabel}
             {chart.utcOffsetHours != null && (
@@ -176,6 +353,9 @@ export default function ChartPage() {
       router.replace(`/login?next=${encodeURIComponent(next)}`);
     }
   }, [authLoading, user, router, pathname, id]);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -274,6 +454,33 @@ export default function ChartPage() {
           onClose={() => setAiOpen(false)}
         />
 
+        {editOpen && summary && (
+          <EditBirthModal
+            chartId={id}
+            initialDate={summary.birthDate}
+            initialTime={summary.birthTime}
+            onClose={() => setEditOpen(false)}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ['birth-summary', id] });
+              queryClient.invalidateQueries({ queryKey: ['chart', id] });
+              queryClient.invalidateQueries({ queryKey: ['moon-chart', id] });
+              queryClient.invalidateQueries({ queryKey: ['my-charts'] });
+            }}
+          />
+        )}
+
+        {deleteOpen && summary && (
+          <DeleteConfirmModal
+            chartId={id}
+            chartName={summary.name}
+            onClose={() => setDeleteOpen(false)}
+            onDeleted={() => {
+              queryClient.invalidateQueries({ queryKey: ['my-charts'] });
+              router.replace('/');
+            }}
+          />
+        )}
+
         {/* header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -306,6 +513,26 @@ export default function ChartPage() {
           </div>
           {!accessDenied && (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {summary && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditOpen(true)}
+                    title="Edit birth date & time"
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white/80 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-amber-400/60 hover:bg-amber-50 dark:border-white/15 dark:bg-white/5 dark:text-white/70 dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
+                  >
+                    ✎ Edit Date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteOpen(true)}
+                    title="Delete this chart"
+                    className="flex items-center gap-1.5 rounded-lg border border-red-300/60 bg-red-50/80 px-3 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:border-red-400 hover:bg-red-100 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:border-red-400/60 dark:hover:bg-red-500/20"
+                  >
+                    🗑 Delete
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={runGlobalAi}

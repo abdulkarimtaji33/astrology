@@ -5,6 +5,7 @@ import { join } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import OpenAI from 'openai';
 import { CreateBirthRecordDto } from './dto/create-birth-record.dto';
+import { UpdateBirthRecordDto } from './dto/update-birth-record.dto';
 import { BirthRecord } from './birth-record.entity';
 import { AiAnalysis } from './ai-analysis.entity';
 import { PlanetaryAvastha } from '../entities/planetary-avastha.entity';
@@ -213,6 +214,20 @@ export class BirthRecordsService implements OnModuleInit {
       cityName: r.cityName ?? null,
       timezone: r.timezone ?? null,
     };
+  }
+
+  async updateBirthDateTime(id: number, dto: UpdateBirthRecordDto, userId: number): Promise<void> {
+    const record = await this.assertAccess(id, userId);
+    if (dto.birthDate !== undefined) record.birthDate = new Date(dto.birthDate);
+    if (dto.birthTime !== undefined) {
+      record.birthTime = dto.birthTime.length === 5 ? `${dto.birthTime}:00` : dto.birthTime;
+    }
+    await this.repo.save(record);
+  }
+
+  async delete(id: number, userId: number): Promise<void> {
+    await this.assertAccess(id, userId);
+    await this.repo.delete({ id });
   }
 
   // ── private helpers ───────────────────────────────────────────────────────

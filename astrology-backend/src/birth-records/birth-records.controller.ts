@@ -2,15 +2,19 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { BirthRecordsService } from './birth-records.service';
 import { CreateBirthRecordDto } from './dto/create-birth-record.dto';
+import { UpdateBirthRecordDto } from './dto/update-birth-record.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Public } from '../auth/public.decorator';
 import { ReqUser } from '../auth/req-user.decorator';
@@ -120,6 +124,25 @@ export class BirthRecordsController {
     @ReqUser() user: { id: number; email: string },
   ) {
     return this.service.listAiAnalyses(id, user.id);
+  }
+
+  @Patch(':id')
+  @HttpCode(204)
+  updateBirthDateTime(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateBirthRecordDto,
+    @ReqUser() user: { id: number; email: string },
+  ) {
+    return this.service.updateBirthDateTime(id, dto, user.id);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  delete(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqUser() user: { id: number; email: string },
+  ) {
+    return this.service.delete(id, user.id);
   }
 
   @Get(':id/ai-analyses/:analysisId')

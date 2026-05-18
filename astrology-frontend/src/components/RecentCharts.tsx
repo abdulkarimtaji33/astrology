@@ -1,7 +1,8 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -42,6 +43,58 @@ function formatBirthDate(raw: string): string {
 
 const sectionTitle =
   'border-l-2 border-amber-500/70 pl-3 text-xs font-medium uppercase tracking-widest text-slate-500 dark:border-amber-400/50 dark:text-white/40';
+
+function InlineDeleteButton({ id, name }: { id: number; name: string }) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const doDelete = async () => {
+    setLoading(true);
+    try {
+      await api.delete(`/birth-records/${id}`);
+      void queryClient.invalidateQueries({ queryKey: ['my-charts'] });
+    } catch {
+      setLoading(false);
+      setConfirming(false);
+    }
+  };
+
+  if (confirming) {
+    return (
+      <div ref={ref} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300/60 bg-red-50 px-2.5 py-1.5 dark:border-red-400/30 dark:bg-red-500/10">
+        <span className="text-xs text-red-700 dark:text-red-400">Delete {name}?</span>
+        <button
+          type="button"
+          onClick={doDelete}
+          disabled={loading}
+          className="rounded px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-500/20"
+        >
+          {loading ? '…' : 'Yes'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="rounded px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100 dark:text-white/40 dark:hover:bg-white/5"
+        >
+          No
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      title="Delete chart"
+      className="shrink-0 rounded-lg border border-transparent p-1.5 text-slate-400 transition hover:border-red-300/50 hover:bg-red-50 hover:text-red-600 dark:text-white/25 dark:hover:border-red-400/30 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+    >
+      🗑
+    </button>
+  );
+}
 
 export default function RecentCharts() {
   const { user, loading: authLoading } = useAuth();
@@ -91,12 +144,15 @@ export default function RecentCharts() {
                 )}
               </p>
             </div>
-            <Link
-              href={`/chart/${row.id}`}
-              className="ml-3 shrink-0 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300 dark:hover:border-amber-400/50 dark:hover:bg-amber-400/20"
-            >
-              Open →
-            </Link>
+            <div className="ml-3 flex shrink-0 items-center gap-2">
+              <InlineDeleteButton id={row.id} name={row.name} />
+              <Link
+                href={`/chart/${row.id}`}
+                className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300 dark:hover:border-amber-400/50 dark:hover:bg-amber-400/20"
+              >
+                Open →
+              </Link>
+            </div>
           </div>
         ))}
       </div>
