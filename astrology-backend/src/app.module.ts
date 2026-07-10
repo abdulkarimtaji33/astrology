@@ -11,6 +11,7 @@ import { ORM_ENTITIES } from './orm-entities';
 import { AdminModule } from './admin/admin.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { AuthModule } from './auth/auth.module';
+import { NameNumerologyModule } from './name-numerology/name-numerology.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AuthModule } from './auth/auth.module';
     WorldEventsModule,
     AdminModule,
     RemindersModule,
+    NameNumerologyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

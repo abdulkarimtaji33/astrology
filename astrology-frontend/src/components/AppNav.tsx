@@ -14,6 +14,7 @@ export default function AppNav() {
   const isHome = pathname === '/';
   const isWorldEvents = pathname === '/world-events';
   const isReminders = pathname === '/reminders';
+  const isNameNumerology = pathname === '/name-numerology';
 
   return (
     <header
@@ -46,6 +47,17 @@ export default function AppNav() {
           ].join(' ')}
         >
           World Events
+        </Link>
+        <Link
+          href="/name-numerology"
+          className={[
+            'shrink-0 rounded-lg px-2.5 py-1.5 text-sm transition sm:px-3',
+            isNameNumerology
+              ? 'border border-emerald-300/80 bg-emerald-100/90 text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200'
+              : 'text-emerald-700 hover:bg-emerald-100/70 dark:text-emerald-300/80 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-200',
+          ].join(' ')}
+        >
+          Name Numerology
         </Link>
         {user && (
           <Link
