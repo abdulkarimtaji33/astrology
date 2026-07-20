@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import api from '@/lib/api';
+import PlacementMeaningModal, { PlacementMeaningPayload } from './PlacementMeaningModal';
 
 export interface HousePlanetDetail {
   planet: string;
@@ -74,6 +75,7 @@ export default function HouseTable({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [result, setResult] = useState<HouseAiResult | null>(null);
+  const [meaningPayload, setMeaningPayload] = useState<PlacementMeaningPayload | null>(null);
 
   const toggleCollapse = useCallback((h: number) => {
     setCollapsed(prev => {
@@ -223,6 +225,15 @@ export default function HouseTable({
                                   {special === 'own' ? 'own' : special.slice(0, 3)}
                                 </span>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => setMeaningPayload({ planet: p.planet, house: h.house, sign: h.sign })}
+                                title={`What ${p.planet} means in house ${h.house} and in ${h.sign}`}
+                                className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/10 text-[9px] leading-none opacity-70 hover:opacity-100 dark:bg-white/15"
+                                aria-label={`Meaning of ${p.planet} in house ${h.house}`}
+                              >
+                                ⓘ
+                              </button>
                             </div>
                           );
                         })}
@@ -250,6 +261,10 @@ export default function HouseTable({
           </tbody>
         </table>
       </div>
+
+      {meaningPayload && (
+        <PlacementMeaningModal payload={meaningPayload} onClose={() => setMeaningPayload(null)} />
+      )}
 
       {modalOpen && (
         <div
