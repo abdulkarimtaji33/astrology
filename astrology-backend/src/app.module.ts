@@ -12,6 +12,7 @@ import { AdminModule } from './admin/admin.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { AuthModule } from './auth/auth.module';
 import { NameNumerologyModule } from './name-numerology/name-numerology.module';
+import { PlacementMeaningsModule } from './placement-meanings/placement-meanings.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { NameNumerologyModule } from './name-numerology/name-numerology.module';
     AdminModule,
     RemindersModule,
     NameNumerologyModule,
+    PlacementMeaningsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

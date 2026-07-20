@@ -1,10 +1,17 @@
 /**
- * Populates planet_house_interpretations and planet_drishti.
+ * Populates planet_drishti (planetary aspects).
+ *
+ * NOTE: planet_house_interpretations is no longer seeded from here — the
+ * short one-line placeholder text below was replaced by the full guide
+ * content in info.md. Use scripts/seed-placement-meanings.js for that table
+ * and for planet_sign_interpretations. The INTERP data below is kept only
+ * as historical reference and is intentionally unused.
  * Run: node scripts/seed-planet-interpretations.js
  */
 const mysql = require('mysql2/promise');
 
-const INTERP = {
+// eslint-disable-next-line no-unused-vars
+const INTERP_UNUSED_LEGACY = {
   1: {
     1: `Strong willpower, leadership, and vitality; can cause premature balding or a hot temperament.`,
     2: `Wealth through government or father; creates a bold, sometimes harsh way of speaking.`,
@@ -190,22 +197,9 @@ async function main() {
 
   await c.query('SET FOREIGN_KEY_CHECKS=0');
   await c.query('TRUNCATE TABLE planet_drishti');
-  await c.query('TRUNCATE TABLE planet_house_interpretations');
   await c.query('SET FOREIGN_KEY_CHECKS=1');
 
   const houses = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  const interpRows = [];
-  for (const [pidStr, byHouse] of Object.entries(INTERP)) {
-    const pid = parseInt(pidStr, 10);
-    for (const [hidStr, text] of Object.entries(byHouse)) {
-      const hid = parseInt(hidStr, 10);
-      interpRows.push([pid, hid, text]);
-    }
-  }
-  await c.query(
-    'INSERT INTO planet_house_interpretations (planet_id, house_id, interpretation) VALUES ?',
-    [interpRows],
-  );
 
   const drishti = [];
   const add = (pid, occ, aspects, startOrder = 0) => {
@@ -235,9 +229,8 @@ async function main() {
     [drishti],
   );
 
-  const [ic] = await c.query('SELECT COUNT(*) c FROM planet_house_interpretations');
   const [dc] = await c.query('SELECT COUNT(*) c FROM planet_drishti');
-  console.log('Inserted planet_house_interpretations:', ic[0].c, 'planet_drishti:', dc[0].c);
+  console.log('Inserted planet_drishti:', dc[0].c);
   await c.end();
 }
 

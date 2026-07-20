@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import PlacementMeaningModal, { PlacementMeaningPayload } from './PlacementMeaningModal';
+
 interface PlanetAvastha {
   name: string | null;
   englishName: string | null;
@@ -48,8 +51,13 @@ const PLANET_SYMBOL: Record<string, string> = {
 };
 
 export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) {
+  const [meaningPayload, setMeaningPayload] = useState<PlacementMeaningPayload | null>(null);
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white/90 shadow-md backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:shadow-xl">
+      {meaningPayload && (
+        <PlacementMeaningModal payload={meaningPayload} onClose={() => setMeaningPayload(null)} />
+      )}
       <div className="px-5 pb-3 pt-5">
         <h2 className="text-sm font-medium uppercase tracking-widest text-slate-500 dark:text-white/40">
           Planetary Positions
@@ -66,6 +74,7 @@ export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) 
               <th className="px-3 py-2">Avasthā</th>
               <th className="px-3 py-2">Strength</th>
               <th className="px-3 py-2">Dignity</th>
+              <th className="px-3 py-2">Meaning</th>
             </tr>
           </thead>
           <tbody>
@@ -133,6 +142,16 @@ export default function PlanetTable({ planets }: { planets: PlanetPosition[] }) 
                       </span>
                     ))}
                   </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setMeaningPayload({ planet: p.planet, house: p.house, sign: p.sign })}
+                    className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-700 hover:bg-amber-400/20 dark:text-amber-300 transition-colors"
+                    title={`What ${p.planet} means in house ${p.house} and in ${p.sign}`}
+                  >
+                    Meaning
+                  </button>
                 </td>
               </tr>
             ))}

@@ -9,6 +9,7 @@ import { PlanetRelationship } from './entities/planet-relationship.entity';
 import { PlanetaryAvastha } from './entities/planetary-avastha.entity';
 import { ZodiacSign } from './entities/zodiac-sign.entity';
 import { PlanetHouseInterpretation } from './entities/planet-house-interpretation.entity';
+import { PlanetSignInterpretation } from './entities/planet-sign-interpretation.entity';
 import { PlanetDrishti } from './entities/planet-drishti.entity';
 import { GeoRegion } from './entities/region.entity';
 import { Subregion } from './entities/subregion.entity';
@@ -27,6 +28,7 @@ export const ORM_ENTITIES = [
   PlanetaryAvastha,
   ZodiacSign,
   PlanetHouseInterpretation,
+  PlanetSignInterpretation,
   PlanetDrishti,
   GeoRegion,
   Subregion,

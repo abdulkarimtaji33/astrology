@@ -9,6 +9,7 @@ import api from '@/lib/api';
 import { DiamondChart, ChartShape } from './LagnaChartSVG';
 import AiAnalysisModal, { AiAnalysisResult } from './AiAnalysisModal';
 import MahadashaPanel from './MahadashaPanel';
+import PlacementMeaningModal, { PlacementMeaningPayload } from './PlacementMeaningModal';
 
 interface AiAnalysisSummary {
   id: number;
@@ -128,9 +129,13 @@ function TransitTable({
 }) {
   const natalMap = new Map(natalPlanets.map(p => [p.planet, p]));
   const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
+  const [meaningPayload, setMeaningPayload] = useState<PlacementMeaningPayload | null>(null);
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/[0.12] bg-gradient-to-b from-slate-100/95 to-slate-50/90 dark:from-white/[0.07] dark:to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
+      {meaningPayload && (
+        <PlacementMeaningModal payload={meaningPayload} onClose={() => setMeaningPayload(null)} />
+      )}
       <div className="px-5 pt-5 pb-3">
         <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-slate-600 dark:text-white/40">
           Transit vs Natal
@@ -148,6 +153,7 @@ function TransitTable({
               <th className="px-3 py-2.5">Natal Sign</th>
               <th className="px-3 py-2.5">Natal House</th>
               <th className="px-3 py-2.5">Dignity</th>
+              <th className="px-3 py-2.5">Meaning</th>
             </tr>
           </thead>
           <tbody>
@@ -237,6 +243,16 @@ function TransitTable({
                     <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
                       {dignityKey}
                     </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setMeaningPayload({ planet: tp.planet, house: tp.house, sign: tp.sign })}
+                      className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-700 dark:text-amber-300 hover:bg-amber-400/20 transition-colors"
+                      title={`What ${tp.planet} means in house ${tp.house} and in ${tp.sign}`}
+                    >
+                      Meaning
+                    </button>
                   </td>
                 </tr>
               );
@@ -849,6 +865,7 @@ function HouseView({
   const [hiddenHouses, setHiddenHouses] = useState<Set<number>>(new Set());
   const [collapsedHouses, setCollapsedHouses] = useState<Set<number>>(new Set());
   const [selectedHouse, setSelectedHouse] = useState<number | null>(null);
+  const [meaningPayload, setMeaningPayload] = useState<PlacementMeaningPayload | null>(null);
 
   const natalMap   = new Map(natalPlanets.map(p => [p.planet, p]));
   const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
@@ -888,6 +905,10 @@ function HouseView({
           defaultEmail={accountEmail ?? ''}
           onClose={() => setSelectedHouse(null)}
         />
+      )}
+
+      {meaningPayload && (
+        <PlacementMeaningModal payload={meaningPayload} onClose={() => setMeaningPayload(null)} />
       )}
 
       <div className="rounded-2xl border border-slate-200 dark:border-white/[0.12] bg-gradient-to-b from-slate-100/95 to-slate-50/90 dark:from-white/[0.07] dark:to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
@@ -933,6 +954,7 @@ function HouseView({
                 <th className="px-3 py-2.5">Natal Sign</th>
                 <th className="px-3 py-2.5">Natal House</th>
                 <th className="px-3 py-2.5">Dignity</th>
+                <th className="px-3 py-2.5">Meaning</th>
               </tr>
             </thead>
             <tbody>
@@ -1006,7 +1028,7 @@ function HouseView({
                           <span className="text-sm font-bold tabular-nums text-slate-500 dark:text-white/40">{house}</span>
                         </div>
                       </td>
-                      <td colSpan={7} className="px-3 py-1 text-[11px] italic text-slate-400 dark:text-white/20">
+                      <td colSpan={8} className="px-3 py-1 text-[11px] italic text-slate-400 dark:text-white/20">
                         hidden
                       </td>
                     </tr>
@@ -1039,7 +1061,7 @@ function HouseView({
                       <td className="px-3 py-1 text-[11px] text-amber-700/70 dark:text-amber-300/60 border-r border-slate-200/70 dark:border-white/8 max-w-[160px]">
                         <span className="line-clamp-1">{hi?.mainTheme ?? '—'}</span>
                       </td>
-                      <td colSpan={6} className="px-3 py-1 text-[11px] text-slate-500 dark:text-white/40 tabular-nums">
+                      <td colSpan={7} className="px-3 py-1 text-[11px] text-slate-500 dark:text-white/40 tabular-nums">
                         {summary}
                       </td>
                     </tr>
@@ -1058,7 +1080,7 @@ function HouseView({
                         <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
                         <p className="mt-0.5 text-[10px] text-slate-500 dark:text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
                       </td>
-                      <td colSpan={6} className="px-3 py-3 text-xs text-slate-500 dark:text-white/30">—</td>
+                      <td colSpan={7} className="px-3 py-3 text-xs text-slate-500 dark:text-white/30">—</td>
                     </tr>
                   );
                 }
@@ -1136,6 +1158,17 @@ function HouseView({
                         <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
                           {dignityKey}
                         </span>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <button
+                          type="button"
+                          onClick={e => { stop(e); setMeaningPayload({ planet: tp.planet, house, sign: tp.sign }); }}
+                          className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-700 dark:text-amber-300 hover:bg-amber-400/20 transition-colors"
+                          title={`What ${tp.planet} means in house ${house} and in ${tp.sign}`}
+                        >
+                          Meaning
+                        </button>
                       </td>
                     </tr>
                   );
