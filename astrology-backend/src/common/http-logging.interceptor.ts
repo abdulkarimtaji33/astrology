@@ -11,6 +11,10 @@ import { tap } from 'rxjs/operators';
 const MAX_BODY = 800;
 const MAX_RESPONSE = 2500;
 
+/** Never write credentials/tokens to logs. */
+const SENSITIVE = /pass(word)?|token|secret|authorization|cookie|api[-_]?key/i;
+const redact = (key: string, value: unknown) => (SENSITIVE.test(key) ? '[REDACTED]' : value);
+
 @Injectable()
 export class HttpLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
@@ -38,7 +42,7 @@ export class HttpLoggingInterceptor implements NestInterceptor {
   private truncJson(v: unknown): string {
     if (v == null) return '{}';
     try {
-      const s = JSON.stringify(v);
+      const s = JSON.stringify(v, redact);
       return s.length > MAX_BODY ? `${s.slice(0, MAX_BODY)}…(${s.length}b)` : s;
     } catch {
       return '(unserializable)';
@@ -50,7 +54,7 @@ export class HttpLoggingInterceptor implements NestInterceptor {
     if (typeof data === 'string')
       return data.length > MAX_RESPONSE ? `${data.slice(0, MAX_RESPONSE)}…(${data.length}b)` : data;
     try {
-      const s = JSON.stringify(data);
+      const s = JSON.stringify(data, redact);
       return s.length > MAX_RESPONSE ? `${s.slice(0, MAX_RESPONSE)}…(${s.length} chars)` : s;
     } catch {
       return '(unserializable)';

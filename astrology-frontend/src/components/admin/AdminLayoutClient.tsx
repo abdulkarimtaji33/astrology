@@ -1,6 +1,7 @@
 "use client";
 
-import adminApi, { clearAdminKey, clearAdminLegacyKey, getAdminKey, getAdminJwt, setAdminKey, setAdminJwt } from "@/lib/adminApi";
+import adminApi, { clearAdminKey, getAdminKey, setAdminKey } from "@/lib/adminApi";
+import { useAuth } from "@/contexts/auth-context";
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -431,6 +432,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, loading: sessionLoading, login, logout } = useAuth();
 
   const verifyAccess = useCallback(async (): Promise<boolean> => {
     try {
@@ -446,17 +448,19 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     setAuthError(null);
     setAuthLoading(true);
     try {
-      const res = await adminApi.post<{ accessToken: string }>("/admin/login", { email, password });
-      clearAdminLegacyKey();
-      setAdminJwt(res.data.accessToken);
-      await verifyAccess();
+      await login(email, password);
+      const ok = await verifyAccess();
+      if (!ok) {
+        await logout();
+        setAuthError("This account does not have admin access.");
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setAuthError(typeof msg === 'string' ? msg : "Invalid credentials or not an admin account.");
+      setAuthError(typeof msg === 'string' ? msg : "Invalid credentials.");
     } finally {
       setAuthLoading(false);
     }
-  }, [verifyAccess]);
+  }, [verifyAccess, login, logout]);
 
   const handleKeyLogin = useCallback(async (k: string) => {
     setAuthError(null);
@@ -471,15 +475,14 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   }, [verifyAccess]);
 
   useEffect(() => {
-    // Try JWT first, then API key
-    const jwt = getAdminJwt();
-    const key = getAdminKey();
-    if (jwt || key) {
+    // Wait for the shared session to restore, then check admin access (session or break-glass key).
+    if (sessionLoading) return;
+    if (user || getAdminKey()) {
       void verifyAccess().then(() => setBoot(false));
     } else {
       setBoot(false);
     }
-  }, [verifyAccess]);
+  }, [sessionLoading, user, verifyAccess]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -488,6 +491,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   function signOut() {
     clearAdminKey();
     setAuthed(false);
+    void logout();
   }
 
   if (boot) return <LoadingScreen />;

@@ -2,26 +2,30 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { isAxiosError } from 'axios';
 import { AuthCard, AuthShell, ErrorBanner, FieldLabel, PasswordField } from '@/components/auth-ui';
+import { SIGNUP_ENABLED } from '@/lib/features';
 
 function LoginForm() {
   const { login, user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/';
+  // Only same-site paths: never let ?next= bounce the user to another website.
+  const rawNext = searchParams.get('next') || '/';
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && user) {
-    router.replace(next);
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && user) router.replace(next);
+  }, [loading, user, next, router]);
+
+  if (!loading && user) return null;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,19 +65,24 @@ function LoginForm() {
           />
         </div>
         <div>
-          <FieldLabel htmlFor="login-password">Password</FieldLabel>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="login-password" className="text-sm font-medium text-slate-700 dark:text-white/80">Password</label>
+            <Link href="/forgot-password" className="text-xs font-semibold text-amber-700 hover:underline dark:text-amber-300">Forgot password?</Link>
+          </div>
           <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </div>
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block mt-1 min-h-12">
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <p className="mt-6 text-center text-sm text-slate-600 dark:text-white/50">
-        New here?{' '}
-        <Link href="/register" className="font-semibold text-amber-700 hover:underline dark:text-amber-300">
-          Create a free account
-        </Link>
-      </p>
+      {SIGNUP_ENABLED && (
+        <p className="mt-6 text-center text-sm text-slate-600 dark:text-white/50">
+          New here?{' '}
+          <Link href="/register" className="font-semibold text-amber-700 hover:underline dark:text-amber-300">
+            Create a free account
+          </Link>
+        </p>
+      )}
     </AuthCard>
   );
 }

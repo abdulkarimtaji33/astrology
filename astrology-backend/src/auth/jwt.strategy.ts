@@ -5,28 +5,38 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
+import { AuthService } from './auth.service';
+import { JWT_AUDIENCE, JWT_ISSUER, jwtSecret } from './auth.config';
 
-export type JwtPayload = { sub: number; email: string; isAdmin?: boolean };
+export type JwtPayload = { sub: number; email: string; isAdmin?: boolean; sid: string };
+
+export type AuthedUser = { id: number; email: string; isAdmin: boolean; sid: string };
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
-    @Inject(ConfigService)
-    config: ConfigService,
+    @Inject(ConfigService) _config: ConfigService,
     @InjectRepository(User)
     private users: Repository<User>,
+    private auth: AuthService,
   ) {
-    const secret = config.get<string>('JWT_SECRET') || 'dev-insecure';
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: jwtSecret(),
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+      algorithms: ['HS256'],
     });
   }
 
-  async validate(payload: JwtPayload): Promise<{ id: number; email: string; isAdmin: boolean }> {
-    const user = await this.users.findOne({ where: { id: payload.sub } });
-    if (!user) throw new UnauthorizedException('Session invalid or expired');
-    return { id: user.id, email: user.email, isAdmin: !!user.isAdmin };
+  async validate(payload: JwtPayload): Promise<AuthedUser> {
+    if (!payload?.sid) throw new UnauthorizedException('Session invalid or expired');
+    const [user, active] = await Promise.all([
+      this.users.findOne({ where: { id: Number(payload.sub) } }),
+      this.auth.isSessionActive(payload.sid),
+    ]);
+    if (!user || !active) throw new UnauthorizedException('Session invalid or expired');
+    return { id: user.id, email: user.email, isAdmin: !!user.isAdmin, sid: payload.sid };
   }
 }

@@ -32,6 +32,9 @@ function forwardHeaders(req: NextRequest): Record<string, string> {
     if (!HOP_BY_HOP.has(key.toLowerCase())) out[key] = value;
   });
   out.host = new URL(BACKEND).host;
+  // Let the API see the real client IP (rate limits, session metadata) and original protocol
+  // (decides the cookie Secure flag). A reverse proxy in front (nginx) sets these; we keep them.
+  if (!out['x-forwarded-proto']) out['x-forwarded-proto'] = new URL(req.url).protocol.replace(':', '');
   return out;
 }
 

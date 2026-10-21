@@ -56,13 +56,6 @@ class AdminLoginDto {
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
-  /** Public — verifies admin credentials, returns the API key */
-  @SkipAdminGuard()
-  @Post('login')
-  adminLogin(@Body() dto: AdminLoginDto) {
-    return this.admin.adminLogin(dto.email, dto.password);
-  }
-
   @Get('health')
   health() {
     return this.admin.health();

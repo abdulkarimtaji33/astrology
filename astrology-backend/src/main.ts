@@ -1,5 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { HttpAdapterHost, NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { HttpLoggingInterceptor } from './common/http-logging.interceptor';
@@ -12,11 +15,20 @@ process.on('unhandledRejection', (reason) => {
 });
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(['log', 'error', 'warn', 'debug', 'verbose']);
+  // The API sits behind the Next proxy (and nginx in production): trust X-Forwarded-* for client IP/proto.
+  app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback');
+  app.use(helmet());
+  app.use(cookieParser());
   app.useGlobalInterceptors(new HttpLoggingInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter(app.get(HttpAdapterHost)));
-  app.enableCors();
+  // Browsers only talk to the same-origin Next proxy, so CORS is closed unless origins are listed.
+  const origins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: origins.length ? origins : false, credentials: true });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

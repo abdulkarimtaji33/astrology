@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useAuth } from '@/contexts/auth-context';
+import { SIGNUP_ENABLED } from '@/lib/features';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface CityResult {
@@ -117,12 +118,12 @@ export default function BirthDataForm() {
         <div>
           <h2 className="text-2xl font-semibold">Start your chart</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-white/60">
-            Charts are private to your account. Create a free account to generate and save charts.
+            Charts are private to your account. {SIGNUP_ENABLED ? 'Create a free account' : 'Sign in'} to generate and save charts.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Link href="/register" className="btn btn-primary min-h-12 flex-1">Create free account</Link>
-          <Link href="/login" className="btn btn-secondary min-h-12 flex-1">Sign in</Link>
+          <Link href="/login" className="btn btn-primary min-h-12 flex-1">Sign in</Link>
+          {SIGNUP_ENABLED && <Link href="/register" className="btn btn-secondary min-h-12 flex-1">Create free account</Link>}
         </div>
       </div>
     );

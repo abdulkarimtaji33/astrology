@@ -1,4 +1,5 @@
 import axios from "axios";
+import { attachAuth } from "@/lib/api";
 
 function baseURL() {
   return typeof window !== "undefined"
@@ -6,52 +7,44 @@ function baseURL() {
     : `${process.env.INTERNAL_NEXT_ORIGIN || "http://127.0.0.1:3000"}/api-proxy`;
 }
 
-const adminApi = axios.create({
-  baseURL: baseURL(),
-  headers: { "Content-Type": "application/json" },
-  timeout: 120_000,
-});
+/** Admin screens share the normal session (in-memory access token + refresh cookie). */
+const adminApi = attachAuth(
+  axios.create({
+    baseURL: baseURL(),
+    headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+    timeout: 120_000,
+  }),
+);
 
-const KEY_STORAGE   = "astrologyAdminKey";
-const TOKEN_STORAGE = "astrologyAdminJwt";
+// ── Optional break-glass API key (sessionStorage only; cleared when the tab closes) ──────────
+const KEY_STORAGE = "astrologyAdminKey";
 
-// ── API key (legacy) ──────────────────────────────────────────────────────
 export function getAdminKey(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem(KEY_STORAGE) ?? "";
+  try {
+    return sessionStorage.getItem(KEY_STORAGE) ?? "";
+  } catch {
+    return "";
+  }
 }
 export function setAdminKey(key: string) {
-  localStorage.setItem(KEY_STORAGE, key);
+  try {
+    sessionStorage.setItem(KEY_STORAGE, key);
+  } catch {
+    /* ignore */
+  }
 }
 export function clearAdminKey() {
-  localStorage.removeItem(KEY_STORAGE);
-  localStorage.removeItem(TOKEN_STORAGE);
+  try {
+    sessionStorage.removeItem(KEY_STORAGE);
+  } catch {
+    /* ignore */
+  }
 }
 
-export function clearAdminLegacyKey() {
-  if (typeof window !== "undefined") localStorage.removeItem(KEY_STORAGE);
-}
-
-// ── JWT (email/password admin) ────────────────────────────────────────────
-export function getAdminJwt(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(TOKEN_STORAGE) ?? "";
-}
-export function setAdminJwt(token: string) {
-  localStorage.setItem(TOKEN_STORAGE, token);
-}
-
-// ── Request interceptor ───────────────────────────────────────────────────
 adminApi.interceptors.request.use((config) => {
-  const jwt = getAdminJwt();
-  if (jwt) {
-    (config.headers as Record<string, string>)["Authorization"] = `Bearer ${jwt}`;
-    return config;
-  }
   const k = getAdminKey();
-  if (k) {
-    (config.headers as Record<string, string>)["X-Admin-Key"] = k;
-  }
+  if (k) config.headers.set("X-Admin-Key", k);
   return config;
 });
 

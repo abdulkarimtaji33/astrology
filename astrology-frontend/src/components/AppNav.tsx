@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import ThemeToggle from '@/components/ThemeToggle';
+import { SIGNUP_ENABLED } from '@/lib/features';
 
 type Item = { href: string; label: string; icon: ReactNode; match: (p: string) => boolean; authOnly?: boolean };
 
@@ -145,12 +146,14 @@ export default function AppNav() {
             </button>
           ) : (
             <div className="flex items-center gap-1.5">
-              <Link href="/login" className="btn btn-ghost btn-sm hidden sm:inline-flex">
+              <Link href="/login" className={SIGNUP_ENABLED ? 'btn btn-ghost btn-sm hidden sm:inline-flex' : 'btn btn-primary btn-sm'}>
                 Sign in
               </Link>
-              <Link href="/register" className="btn btn-primary btn-sm">
-                Get started
-              </Link>
+              {SIGNUP_ENABLED && (
+                <Link href="/register" className="btn btn-primary btn-sm">
+                  Get started
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -222,19 +225,20 @@ export default function AppNav() {
               {user && (
                 <MenuLink href="/reminders" label="Reminders" hint="Transit email alerts" />
               )}
+              {user && <MenuLink href="/account" label="Account & security" hint="Password, sessions" />}
               <MenuLink href="/world-events" label="World events" hint="Planetary events & transits" />
               <MenuLink href="/name-numerology" label="Name numerology" hint="Check any name" />
-              {user && <MenuLink href="/admin" label="Admin console" hint="Manage records & data" />}
+              {user?.isAdmin && <MenuLink href="/admin" label="Admin console" hint="Manage records & data" />}
             </ul>
             <div className="mt-4 flex gap-2">
               {user ? (
-                <button type="button" onClick={() => { setSheet(false); logout(); }} className="btn btn-secondary btn-block">
+                <button type="button" onClick={() => { setSheet(false); void logout(); }} className="btn btn-secondary btn-block">
                   Sign out
                 </button>
               ) : (
                 <>
-                  <Link href="/login" className="btn btn-secondary flex-1">Sign in</Link>
-                  <Link href="/register" className="btn btn-primary flex-1">Create account</Link>
+                  <Link href="/login" className="btn btn-primary flex-1">Sign in</Link>
+                  {SIGNUP_ENABLED && <Link href="/register" className="btn btn-secondary flex-1">Create account</Link>}
                 </>
               )}
             </div>

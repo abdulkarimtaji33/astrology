@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { isAxiosError } from 'axios';
 import {
@@ -13,6 +13,7 @@ import {
   PasswordField,
   PasswordStrength,
 } from '@/components/auth-ui';
+import { SIGNUP_ENABLED } from '@/lib/features';
 
 export default function RegisterPage() {
   const { register, user, loading } = useAuth();
@@ -22,10 +23,23 @@ export default function RegisterPage() {
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && user) {
-    router.replace('/');
-    return null;
+  useEffect(() => {
+    if (!loading && user) router.replace('/');
+  }, [loading, user, router]);
+
+  if (!SIGNUP_ENABLED) {
+    return (
+      <AuthShell>
+        <AuthCard title="Sign-ups are closed" subtitle="New accounts are not being accepted right now">
+          <Link href="/login" className="btn btn-primary btn-block">
+            Sign in
+          </Link>
+        </AuthCard>
+      </AuthShell>
+    );
   }
+
+  if (!loading && user) return null;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
