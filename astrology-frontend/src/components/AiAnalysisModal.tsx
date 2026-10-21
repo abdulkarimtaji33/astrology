@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useDialog } from '@/lib/use-dialog';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 export interface GemstoneAdvice {
@@ -130,6 +131,7 @@ interface Props {
 }
 
 export default function AiAnalysisModal({ isOpen, isLoading, isError, data, transitPeriod, onClose }: Props) {
+  useDialog(onClose, isOpen);
   const [activeSection, setActiveSection] = useState<ModalSection>('overview');
 
   if (!isOpen) return null;

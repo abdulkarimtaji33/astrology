@@ -116,62 +116,45 @@ function PlanesTable({ grid }: { grid: LoShuCell[][] }) {
   ];
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 overflow-hidden">
-      <div className="px-5 pt-5 pb-3">
-        <p className="text-xs font-medium uppercase tracking-widest text-slate-500 dark:text-white/40">Planes of Expression</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200/90 dark:border-white/10 text-left text-[11px] uppercase tracking-wider text-slate-400 dark:text-white/25">
-              <th className="px-5 py-2">Plane</th>
-              <th className="px-3 py-2">Numbers</th>
-              <th className="px-3 py-2">Present</th>
-              <th className="px-3 py-2">Strength</th>
-            </tr>
-          </thead>
-          <tbody>
-            {planes.map(p => {
-              const presentCount = p.numbers.filter(n => cell(n).present).length;
-              const pct = Math.round((presentCount / p.numbers.length) * 100);
-              return (
-                <tr key={p.name} className="border-b border-slate-200/70 dark:border-white/5 hover:bg-white/[0.02]">
-                  <td className="px-5 py-2.5 font-medium text-slate-800 dark:text-white/80">{p.name}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex gap-1">
-                      {p.numbers.map(n => (
-                        <span key={n}
-                          className={[
-                            'flex h-6 w-6 items-center justify-center rounded text-xs font-bold',
-                            cell(n).present
-                              ? 'bg-amber-400/20 text-amber-300'
-                              : 'bg-white/85 dark:bg-white/5 text-slate-400 dark:text-white/20',
-                          ].join(' ')}>
-                          {n}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 tabular-nums text-slate-600 dark:text-white/60">
-                    {presentCount}/{p.numbers.length}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-20 rounded-full bg-white/10">
-                        <div
-                          className="h-1.5 rounded-full bg-amber-400/70"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs tabular-nums text-slate-500 dark:text-white/40">{pct}%</span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <div className="rounded-2xl border border-slate-200/90 bg-white/85 p-5 dark:border-white/10 dark:bg-white/5">
+      <p className="mb-3 text-xs font-medium uppercase tracking-widest text-slate-500 dark:text-white/40">Planes of Expression</p>
+      {/* One row per plane: name + strength bar on top, the three numbers below. Fits any width. */}
+      <ul className="flex flex-col gap-3">
+        {planes.map(p => {
+          const presentCount = p.numbers.filter(n => cell(n).present).length;
+          const pct = Math.round((presentCount / p.numbers.length) * 100);
+          return (
+            <li key={p.name} className="rounded-xl bg-slate-500/[0.06] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold text-slate-800 dark:text-white/85">{p.name}</span>
+                <span className="text-xs tabular-nums text-slate-500 dark:text-white/50">
+                  {presentCount} of {p.numbers.length} present
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex gap-1.5">
+                  {p.numbers.map(n => (
+                    <span
+                      key={n}
+                      className={[
+                        'flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold',
+                        cell(n).present
+                          ? 'bg-amber-400/20 text-amber-700 dark:text-amber-300'
+                          : 'bg-slate-500/10 text-slate-400 dark:text-white/25',
+                      ].join(' ')}
+                    >
+                      {n}
+                    </span>
+                  ))}
+                </div>
+                <div className="h-2 flex-1 rounded-full bg-slate-500/15" aria-label={`${pct}% strength`}>
+                  <div className="h-2 rounded-full bg-gradient-to-r from-amber-300 to-amber-500" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

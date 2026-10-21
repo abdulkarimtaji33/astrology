@@ -10,6 +10,10 @@ import { DiamondChart, ChartShape } from './LagnaChartSVG';
 import AiAnalysisModal, { AiAnalysisResult } from './AiAnalysisModal';
 import MahadashaPanel from './MahadashaPanel';
 import PlacementMeaningModal, { PlacementMeaningPayload } from './PlacementMeaningModal';
+import {
+  Card, DignityTag, ElementTag, HouseBadge, MeaningButton, PlanetGlyph, Rel, RelTag, Retro, Segmented, SectionHeader,
+} from './placement-ui';
+import { useDialog } from '@/lib/use-dialog';
 
 interface AiAnalysisSummary {
   id: number;
@@ -57,14 +61,26 @@ interface TransitResponse {
   days: TransitDayData[];
 }
 
-const PLANET_SYMBOL_SM: Record<string, string> = {
-  Sun:'☉', Moon:'☽', Mercury:'☿', Venus:'♀',
-  Mars:'♂', Jupiter:'♃', Saturn:'♄', Rahu:'☊', Ketu:'☋',
-};
+
 
 // ─── Form schema ───────────────────────────────────────────────────────────
-const today    = new Date().toISOString().slice(0, 10);
-const in30Days = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+const addDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const today    = addDays(0);
+const in30Days = addDays(30);
+
+const PRESETS = [
+  { label: '30 days', days: 30 },
+  { label: '3 months', days: 91 },
+  { label: '6 months', days: 182 },
+  { label: '1 year', days: 365 },
+];
+
+/** 2026-10-21 → "21 Oct 2026" (or "Wed, 21 Oct 2026" with weekday). */
+function prettyDate(iso: string, weekday = false): string {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...(weekday ? { weekday: 'short' } : {}) });
+}
 
 const schema = z.object({
   from: z.string().min(1, 'Start date required'),
@@ -81,43 +97,69 @@ const PLANET_SYMBOL: Record<string, string> = {
   Mars:'♂', Jupiter:'♃', Saturn:'♄', Rahu:'☊', Ketu:'☋',
 };
 
-const SIGN_ELEMENT: Record<string, { label: string; cls: string }> = {
-  Aries:       { label: 'Fire',  cls: 'bg-red-500/15 text-red-400' },
-  Leo:         { label: 'Fire',  cls: 'bg-red-500/15 text-red-400' },
-  Sagittarius: { label: 'Fire',  cls: 'bg-red-500/15 text-red-400' },
-  Taurus:      { label: 'Earth', cls: 'bg-emerald-500/15 text-emerald-400' },
-  Virgo:       { label: 'Earth', cls: 'bg-emerald-500/15 text-emerald-400' },
-  Capricorn:   { label: 'Earth', cls: 'bg-emerald-500/15 text-emerald-400' },
-  Gemini:      { label: 'Air',   cls: 'bg-sky-500/15 text-sky-400' },
-  Libra:       { label: 'Air',   cls: 'bg-sky-500/15 text-sky-400' },
-  Aquarius:    { label: 'Air',   cls: 'bg-sky-500/15 text-sky-400' },
-  Cancer:      { label: 'Water', cls: 'bg-blue-500/15 text-blue-400' },
-  Scorpio:     { label: 'Water', cls: 'bg-blue-500/15 text-blue-400' },
-  Pisces:      { label: 'Water', cls: 'bg-blue-500/15 text-blue-400' },
-};
 
-const DIGNITY_BADGE: Record<string, string> = {
-  own:         'bg-amber-400/20 text-amber-300',
-  exalted:     'bg-emerald-400/20 text-emerald-300',
-  debilitated: 'bg-red-400/20 text-red-300',
-  neutral:     'bg-slate-200/80 text-slate-600 dark:bg-white/10 dark:text-white/50',
-};
 
-const REL_BADGE: Record<PlanetRel, string> = {
-  own:      'bg-amber-400/20 text-amber-300 border-amber-400/30',
-  friendly: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  enemy:    'bg-red-500/15 text-red-300 border-red-500/30',
-  neutral:  'bg-white/10 text-slate-500 dark:text-white/45 border-slate-300 dark:border-white/15',
-};
 
-const REL_TO_LORD_HINT: Record<PlanetRel, string> = {
-  own:      'Own sign — planet is the lord here',
-  friendly: 'Friendly toward sign lord',
-  enemy:    'Inimical toward sign lord',
-  neutral:  'Neutral toward sign lord',
-};
 
-// ─── Transit comparison table ──────────────────────────────────────────────
+
+
+
+
+// ─── Transit planet card (replaces the wide comparison table) ──────────────
+function TransitPlanetCard({
+  tp,
+  natal,
+  hi,
+  onMeaning,
+}: {
+  tp: TransitPlanet;
+  natal?: TransitPlanet;
+  hi?: TransitHouseInfo;
+  onMeaning: () => void;
+}) {
+  const rel = (hi?.planetRelationships?.[tp.planet] ?? 'neutral') as Rel;
+  const moved = natal && natal.sign !== tp.sign;
+  return (
+    <Card className="flex h-full gap-3">
+      <PlanetGlyph planet={tp.planet} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-semibold">{tp.planet}</span>
+          {tp.isRetrograde && <Retro />}
+          <span className="chip ml-auto">House {tp.house}</span>
+        </div>
+        <p className="mt-0.5 text-sm">
+          <span className="font-medium text-indigo-800 dark:text-indigo-200">{tp.sign}</span>{' '}
+          <span className="tabular-nums text-slate-500 dark:text-white/45">{tp.degreeInSign.toFixed(1)}°</span>
+          {hi?.signLord && (
+            <span className="text-xs text-slate-500 dark:text-white/45">
+              {' '}· lord {PLANET_SYMBOL[hi.signLord] ?? ''} {hi.signLord}
+            </span>
+          )}
+        </p>
+        {hi?.mainTheme && <p className="mt-0.5 text-xs font-medium text-amber-800 dark:text-amber-200/90">{hi.mainTheme}</p>}
+        <div className="mt-2 flex flex-wrap gap-1">
+          <RelTag rel={rel} lord={hi?.signLord} />
+          <DignityTag dignity={tp.dignity} />
+          <ElementTag sign={tp.sign} />
+        </div>
+        {natal && (
+          <p className="mt-2 text-xs text-slate-500 dark:text-white/45">
+            Birth chart:{' '}
+            <span className={moved ? 'font-semibold text-amber-700 dark:text-amber-300' : ''}>
+              {natal.sign} {natal.degreeInSign.toFixed(1)}°
+            </span>{' '}
+            · House {natal.house}
+          </p>
+        )}
+        <div className="mt-2">
+          <MeaningButton onClick={onMeaning} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function TransitTable({
   transitPlanets,
   natalPlanets,
@@ -132,134 +174,22 @@ function TransitTable({
   const [meaningPayload, setMeaningPayload] = useState<PlacementMeaningPayload | null>(null);
 
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-white/[0.12] bg-gradient-to-b from-slate-100/95 to-slate-50/90 dark:from-white/[0.07] dark:to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
+    <div>
       {meaningPayload && (
         <PlacementMeaningModal payload={meaningPayload} onClose={() => setMeaningPayload(null)} />
       )}
-      <div className="px-5 pt-5 pb-3">
-        <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-slate-600 dark:text-white/40">
-          Transit vs Natal
-        </h2>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200/90 dark:border-white/10 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:text-white/30">
-              <th className="px-4 py-2.5">Planet</th>
-              <th className="px-3 py-2.5 max-w-[150px]">Transit sign · lord</th>
-              <th className="px-3 py-2.5">Transit House</th>
-              <th className="px-3 py-2.5 min-w-[140px]">House Theme</th>
-              <th className="px-3 py-2.5 max-w-[120px]">vs sign lord</th>
-              <th className="px-3 py-2.5">Natal Sign</th>
-              <th className="px-3 py-2.5">Natal House</th>
-              <th className="px-3 py-2.5">Dignity</th>
-              <th className="px-3 py-2.5">Meaning</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transitPlanets.map(tp => {
-              const natal = natalMap.get(tp.planet);
-              const signChanged  = natal && tp.sign  !== natal.sign;
-              const houseChanged = natal && tp.house !== natal.house;
-              const dignityKey   = tp.dignity.includes('exalted')     ? 'exalted'
-                : tp.dignity.includes('debilitated') ? 'debilitated'
-                : tp.dignity.includes('own')         ? 'own'          : 'neutral';
-
-              const hi = houseByNum.get(tp.house);
-              const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
-
-              return (
-                <tr key={tp.planet}
-                  className="border-b border-slate-200/70 transition-colors duration-150 hover:bg-slate-100/90 dark:border-white/5 dark:hover:bg-white/[0.05]">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-white/90">
-                    <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
-                    {tp.planet}
-                    {tp.isRetrograde && (
-                      <span className="ml-1.5 rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span>
-                        <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>
-                          {tp.sign}
-                        </span>
-                        <span className="ml-2 text-xs tabular-nums text-slate-600 dark:text-white/40">
-                          {tp.degreeInSign.toFixed(1)}°
-                        </span>
-                      </span>
-                      {SIGN_ELEMENT[tp.sign] && (
-                        <span className={`inline-block w-fit rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[tp.sign].cls}`}>
-                          {SIGN_ELEMENT[tp.sign].label}
-                        </span>
-                      )}
-                      {hi?.signLord && (
-                        <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={houseChanged ? 'text-amber-300 font-semibold tabular-nums' : 'tabular-nums text-slate-600 dark:text-white/60'}>
-                      H{tp.house}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 max-w-[200px]">
-                    <p className="text-xs leading-snug text-slate-700 dark:text-white/70 line-clamp-2" title={hi?.represents}>
-                      {hi?.mainTheme ?? '—'}
-                    </p>
-                  </td>
-                  <td className="px-3 py-3 max-w-[120px]">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
-                      title={REL_TO_LORD_HINT[rel]}
-                    >
-                      {rel}
-                    </span>
-                    {hi?.signLord && (
-                      <p className="mt-1 text-[10px] leading-tight text-slate-500 dark:text-white/35">
-                        {tp.planet} → {hi.signLord}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {natal ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-indigo-300/60">
-                          {natal.sign}{' '}
-                          <span className="text-xs text-slate-500 dark:text-white/30">{natal.degreeInSign.toFixed(1)}°</span>
-                        </span>
-                        {SIGN_ELEMENT[natal.sign] && (
-                          <span className={`inline-block w-fit rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[natal.sign].cls}`}>
-                            {SIGN_ELEMENT[natal.sign].label}
-                          </span>
-                        )}
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums text-slate-600 dark:text-white/40">
-                    {natal ? `H${natal.house}` : '—'}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
-                      {dignityKey}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setMeaningPayload({ planet: tp.planet, house: tp.house, sign: tp.sign })}
-                      className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-700 dark:text-amber-300 hover:bg-amber-400/20 transition-colors"
-                      title={`What ${tp.planet} means in house ${tp.house} and in ${tp.sign}`}
-                    >
-                      Meaning
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {transitPlanets.map(tp => (
+          <li key={tp.planet}>
+            <TransitPlanetCard
+              tp={tp}
+              natal={natalMap.get(tp.planet)}
+              hi={houseByNum.get(tp.house)}
+              onMeaning={() => setMeaningPayload({ planet: tp.planet, house: tp.house, sign: tp.sign })}
+            />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -329,6 +259,7 @@ function ReminderModal({
   defaultEmail: string;
   onClose: () => void;
 }) {
+  useDialog(onClose);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail);
   const [sendDate, setSendDate] = useState(payload.firstIsoDate);
   const [subject, setSubject] = useState(
@@ -677,6 +608,7 @@ function HouseHistoryModal({
   defaultEmail: string;
   onClose: () => void;
 }) {
+  useDialog(onClose);
   const [ignoreMoon, setIgnoreMoon] = useState(false);
   const [copyDone, setCopyDone]   = useState(false);
   const [reminderPayload, setReminderPayload] = useState<ReminderPayload | null>(null);
@@ -862,322 +794,129 @@ function HouseView({
   allDays: TransitDayData[];
   accountEmail?: string | null;
 }) {
-  const [hiddenHouses, setHiddenHouses] = useState<Set<number>>(new Set());
-  const [collapsedHouses, setCollapsedHouses] = useState<Set<number>>(new Set());
+  const [filter, setFilter] = useState<'occupied' | 'all'>('occupied');
   const [selectedHouse, setSelectedHouse] = useState<number | null>(null);
   const [meaningPayload, setMeaningPayload] = useState<PlacementMeaningPayload | null>(null);
 
-  const natalMap   = new Map(natalPlanets.map(p => [p.planet, p]));
+  const natalMap = new Map(natalPlanets.map(p => [p.planet, p]));
   const houseByNum = new Map(houseInfo.map(h => [h.house, h]));
 
-  const toggleHouse = (h: number) => {
-    setHiddenHouses(prev => {
-      const next = new Set(prev);
-      if (next.has(h)) next.delete(h); else next.add(h);
-      return next;
-    });
-  };
-
-  const toggleCollapsed = (h: number) => {
-    setCollapsedHouses(prev => {
-      const next = new Set(prev);
-      if (next.has(h)) next.delete(h); else next.add(h);
-      return next;
-    });
-  };
-
-  // Build all 12 houses; within each, sort planets by name
   const allHouses = Array.from({ length: 12 }, (_, i) => i + 1).map(h => ({
     house: h,
     hi: houseByNum.get(h),
     transiting: planets.filter(p => p.house === h).sort((a, b) => a.planet.localeCompare(b.planet)),
+    days: allDays.filter(d => d.planets.some(p => p.house === h)).length,
   }));
-
-  const selectedHouseInfo = selectedHouse !== null ? houseByNum.get(selectedHouse) : undefined;
+  const shown = filter === 'occupied' ? allHouses.filter(h => h.transiting.length > 0) : allHouses;
 
   return (
     <>
       {selectedHouse !== null && (
         <HouseHistoryModal
           house={selectedHouse}
-          hi={selectedHouseInfo}
+          hi={houseByNum.get(selectedHouse)}
           allDays={allDays}
           defaultEmail={accountEmail ?? ''}
           onClose={() => setSelectedHouse(null)}
         />
       )}
-
       {meaningPayload && (
         <PlacementMeaningModal payload={meaningPayload} onClose={() => setMeaningPayload(null)} />
       )}
 
-      <div className="rounded-2xl border border-slate-200 dark:border-white/[0.12] bg-gradient-to-b from-slate-100/95 to-slate-50/90 dark:from-white/[0.07] dark:to-white/[0.03] shadow-xl backdrop-blur-md overflow-hidden">
-        <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-slate-600 dark:text-white/40">
-              Transit by House — {date}
-            </h2>
-            <p className="mt-1 pl-5 text-[11px] text-slate-500 dark:text-white/30">
-              Click a row to open transit history · use arrow to expand/collapse · eye hides the row
-            </p>
+      <SectionHeader
+        title="Houses"
+        subtitle={<>Transits on {prettyDate(date)} · open <strong>History</strong> to see the whole range or set a reminder</>}
+        right={
+          <div className="w-full sm:w-60">
+            <Segmented
+              ariaLabel="Which houses to show"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: 'occupied', label: 'With planets' },
+                { value: 'all', label: 'All 12' },
+              ]}
+            />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {collapsedHouses.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setCollapsedHouses(new Set())}
-                className="text-[11px] text-amber-300/60 hover:text-amber-300 transition-colors"
-              >
-                Expand all
-              </button>
-            )}
-            {hiddenHouses.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setHiddenHouses(new Set())}
-                className="text-[11px] text-amber-300/60 hover:text-amber-300 transition-colors"
-              >
-                Show all
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200/90 dark:border-white/10 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:text-white/30">
-                <th className="px-4 py-2.5">House</th>
-                <th className="px-3 py-2.5 min-w-[140px]">Theme</th>
-                <th className="px-3 py-2.5">Planet</th>
-                <th className="px-3 py-2.5 max-w-[150px]">Transit Sign · Lord</th>
-                <th className="px-3 py-2.5 max-w-[120px]">vs Sign Lord</th>
-                <th className="px-3 py-2.5">Natal Sign</th>
-                <th className="px-3 py-2.5">Natal House</th>
-                <th className="px-3 py-2.5">Dignity</th>
-                <th className="px-3 py-2.5">Meaning</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allHouses.map(({ house, hi, transiting }) => {
-                const isHidden = hiddenHouses.has(house);
-                const isEmpty = transiting.length === 0;
-                const isCollapsed = !isHidden && collapsedHouses.has(house);
-                const transitDayCount = allDays.filter(d => d.planets.some(p => p.house === house)).length;
+        }
+      />
 
-                const rowClass =
-                  'border-b border-slate-200/70 transition-colors duration-150 cursor-pointer hover:bg-slate-100/80 dark:border-white/5 dark:hover:bg-white/[0.05]';
-                const openModal = () => setSelectedHouse(house);
-                const stop = (e: React.MouseEvent) => { e.stopPropagation(); };
-
-                const houseCol = (rowSpan: number, mode: 'hidden' | 'expanded') => (
-                  <td rowSpan={rowSpan} className="px-4 py-3 align-middle border-r border-slate-200/70 dark:border-white/8">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <div className="flex items-center justify-center gap-0.5">
-                        {mode === 'expanded' && (
-                          <button
-                            type="button"
-                            onClick={e => { stop(e); toggleCollapsed(house); }}
-                            className="shrink-0 w-5 h-5 flex items-center justify-center text-[9px] text-amber-300/70 hover:text-amber-200"
-                            title="Collapse to one row"
-                            aria-label="Collapse house row"
-                          >
-                            ▼
-                          </button>
-                        )}
-                        <span
-                          className={
-                            (isEmpty ? 'text-slate-800 dark:text-white/80' : 'text-amber-200') + ' text-xl font-bold tabular-nums leading-none'
-                          }
-                        >
-                          {house}
-                        </span>
-                      </div>
-                      {hi?.sign && <span className="text-[10px] text-indigo-300/70">{hi.sign}</span>}
-                      {hi?.signLord && <span className="text-[10px] text-cyan-400/60">{hi.signLord}</span>}
-                      {transitDayCount > 0 && (
-                        <span className="text-[9px] text-slate-400 dark:text-white/25 tabular-nums">{transitDayCount}d in range</span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={e => { stop(e); toggleHouse(house); }}
-                        className="mt-0.5 text-[11px] text-slate-400 dark:text-white/25 hover:text-slate-600 dark:text-white/60 transition-colors"
-                        title={isHidden ? 'Show house' : 'Hide house'}
-                        aria-label={isHidden ? 'Show house' : 'Hide house'}
-                      >
-                        {isHidden ? '👁' : '🙈'}
-                      </button>
-                    </div>
-                  </td>
-                );
-
-                if (isHidden) {
-                  return (
-                    <tr
-                      key={`h-${house}-hidden`}
-                      className="border-b border-slate-200/70 dark:border-white/5 opacity-35 cursor-pointer hover:opacity-60"
-                      onClick={openModal}
-                    >
-                      <td className="px-3 py-1 border-r border-slate-200/70 dark:border-white/8">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={e => { stop(e); toggleHouse(house); }}
-                            className="text-[9px] text-slate-400 hover:text-slate-600 dark:hover:text-white/60"
-                            title="Show house"
-                          >👁</button>
-                          <span className="text-sm font-bold tabular-nums text-slate-500 dark:text-white/40">{house}</span>
-                        </div>
-                      </td>
-                      <td colSpan={8} className="px-3 py-1 text-[11px] italic text-slate-400 dark:text-white/20">
-                        hidden
-                      </td>
-                    </tr>
-                  );
-                }
-
-                if (isCollapsed) {
-                  const summary = isEmpty
-                    ? '—'
-                    : transiting.map(t => `${PLANET_SYMBOL_SM[t.planet] ?? ''}${t.planet}`).join('  ');
-                  return (
-                    <tr
-                      key={`h-${house}-c`}
-                      className="border-b border-slate-200/70 dark:border-white/5 cursor-pointer hover:bg-slate-100/80 dark:hover:bg-white/[0.04]"
-                      onClick={openModal}
-                    >
-                      <td className="px-3 py-1 border-r border-slate-200/70 dark:border-white/8 w-[68px]">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={e => { stop(e); toggleCollapsed(house); }}
-                            className="text-[9px] text-amber-400/60 hover:text-amber-300 transition-colors"
-                            title="Expand"
-                            aria-label="Expand house row"
-                          >▶</button>
-                          <span className="text-sm font-bold tabular-nums text-amber-200/90">{house}</span>
-                          {hi?.sign && <span className="text-[10px] text-indigo-300/60">{hi.sign}</span>}
-                        </div>
-                      </td>
-                      <td className="px-3 py-1 text-[11px] text-amber-700/70 dark:text-amber-300/60 border-r border-slate-200/70 dark:border-white/8 max-w-[160px]">
-                        <span className="line-clamp-1">{hi?.mainTheme ?? '—'}</span>
-                      </td>
-                      <td colSpan={7} className="px-3 py-1 text-[11px] text-slate-500 dark:text-white/40 tabular-nums">
-                        {summary}
-                      </td>
-                    </tr>
-                  );
-                }
-
-                if (isEmpty) {
-                  return (
-                    <tr
-                      key={`h-${house}`}
-                      className={rowClass}
-                      onClick={openModal}
-                    >
-                      {houseCol(1, 'expanded')}
-                      <td className="px-3 py-3 border-r border-slate-200/70 dark:border-white/8">
-                        <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
-                        <p className="mt-0.5 text-[10px] text-slate-500 dark:text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
-                      </td>
-                      <td colSpan={7} className="px-3 py-3 text-xs text-slate-500 dark:text-white/30">—</td>
-                    </tr>
-                  );
-                }
-
-                return transiting.map((tp, pi) => {
-                  const natal       = natalMap.get(tp.planet);
-                  const signChanged = natal && tp.sign !== natal.sign;
-                  const dignityKey  = tp.dignity.includes('exalted')     ? 'exalted'
-                    : tp.dignity.includes('debilitated') ? 'debilitated'
-                    : tp.dignity.includes('own')         ? 'own'          : 'neutral';
-                  const rel = hi?.planetRelationships?.[tp.planet] ?? 'neutral';
-
-                  return (
-                    <tr
-                      key={`${house}-${tp.planet}`}
-                      className={rowClass}
-                      onClick={openModal}
-                    >
-
-                      {pi === 0 && houseCol(transiting.length, 'expanded')}
-
-                      {pi === 0 && (
-                        <td rowSpan={transiting.length} className="px-3 py-3 align-middle border-r border-slate-200/70 dark:border-white/8 max-w-[180px]">
-                          <p className="text-xs font-medium text-amber-300/70 leading-snug">{hi?.mainTheme ?? '—'}</p>
-                          <p className="mt-0.5 text-[10px] text-slate-500 dark:text-white/30 leading-snug line-clamp-2">{hi?.represents}</p>
-                        </td>
-                      )}
-
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-white/90">
-                        <span className="mr-2 text-lg">{PLANET_SYMBOL[tp.planet] ?? ''}</span>
-                        {tp.planet}
-                        {tp.isRetrograde && (
-                          <span className="ml-1.5 rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
-                        )}
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <div className="flex flex-col gap-0.5">
-                          <span>
-                            <span className={signChanged ? 'text-amber-300 font-medium' : 'text-indigo-300'}>{tp.sign}</span>
-                            <span className="ml-2 text-xs tabular-nums text-slate-600 dark:text-white/40">{tp.degreeInSign.toFixed(1)}°</span>
-                          </span>
-                          {SIGN_ELEMENT[tp.sign] && (
-                            <span className={`inline-block w-fit rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[tp.sign].cls}`}>
-                              {SIGN_ELEMENT[tp.sign].label}
-                            </span>
-                          )}
-                          {hi?.signLord && <span className="text-[10px] text-cyan-400/80">Lord: {hi.signLord}</span>}
-                        </div>
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium capitalize ${REL_BADGE[rel]}`}
-                          title={REL_TO_LORD_HINT[rel]}
-                        >
-                          {rel}
-                        </span>
-                        {hi?.signLord && (
-                          <p className="mt-1 text-[10px] leading-tight text-slate-500 dark:text-white/35">{tp.planet} → {hi.signLord}</p>
-                        )}
-                      </td>
-
-                      <td className="px-3 py-3 text-indigo-300/60 tabular-nums">
-                        {natal
-                          ? <span>{natal.sign} <span className="text-xs text-slate-500 dark:text-white/30">{natal.degreeInSign.toFixed(1)}°</span></span>
-                          : '—'}
-                      </td>
-
-                      <td className="px-3 py-3 tabular-nums text-slate-600 dark:text-white/40">
-                        {natal ? `H${natal.house}` : '—'}
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
-                          {dignityKey}
-                        </span>
-                      </td>
-
-                      <td className="px-3 py-3">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {shown.map(({ house, hi, transiting, days }) => (
+          <li key={house}>
+            <Card className="flex h-full flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <HouseBadge house={house} active={transiting.length > 0} />
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-semibold text-amber-800 dark:text-amber-200">{hi?.mainTheme ?? `House ${house}`}</p>
+                  {hi && (
+                    <p className="text-xs text-slate-500 dark:text-white/50">
+                      {hi.sign} · lord {PLANET_SYMBOL[hi.signLord] ?? ''} {hi.signLord}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedHouse(house)}
+                  className="flex min-h-10 shrink-0 flex-col items-center justify-center rounded-xl px-3 text-xs font-semibold text-cyan-800 ring-1 ring-inset ring-cyan-500/40 transition hover:bg-cyan-500/10 dark:text-cyan-200"
+                >
+                  History
+                  {days > 0 && <span className="text-[10px] font-normal opacity-70">{days} days</span>}
+                </button>
+              </div>
+              {hi?.represents && (
+                <p className="line-clamp-2 text-xs leading-relaxed text-slate-600 dark:text-white/55">{hi.represents}</p>
+              )}
+              {transiting.length > 0 ? (
+                <ul className="flex flex-col gap-1.5">
+                  {transiting.map(tp => {
+                    const natal = natalMap.get(tp.planet);
+                    const rel = (hi?.planetRelationships?.[tp.planet] ?? 'neutral') as Rel;
+                    return (
+                      <li key={tp.planet}>
                         <button
                           type="button"
-                          onClick={e => { stop(e); setMeaningPayload({ planet: tp.planet, house, sign: tp.sign }); }}
-                          className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-700 dark:text-amber-300 hover:bg-amber-400/20 transition-colors"
-                          title={`What ${tp.planet} means in house ${house} and in ${tp.sign}`}
+                          onClick={() => setMeaningPayload({ planet: tp.planet, house, sign: tp.sign })}
+                          className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-slate-500/[0.06] px-3 py-2 text-left transition hover:bg-amber-400/10"
                         >
-                          Meaning
+                          <span aria-hidden className="text-xl leading-none">{PLANET_SYMBOL[tp.planet] ?? '•'}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-semibold">{tp.planet}</span>
+                              <span className="text-xs text-slate-500 dark:text-white/45">
+                                {tp.sign} <span className="tabular-nums">{tp.degreeInSign.toFixed(1)}°</span>
+                              </span>
+                              {tp.isRetrograde && <Retro />}
+                            </span>
+                            <span className="mt-1 flex flex-wrap gap-1">
+                              <RelTag rel={rel} lord={hi?.signLord} />
+                              <DignityTag dignity={tp.dignity} />
+                            </span>
+                            {natal && (
+                              <span className="mt-1 block text-[11px] text-slate-500 dark:text-white/40">
+                                Birth chart: {natal.sign} · House {natal.house}
+                              </span>
+                            )}
+                          </span>
+                          <span aria-hidden className="text-slate-400">›</span>
                         </button>
-                      </td>
-                    </tr>
-                  );
-                });
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="rounded-xl border border-dashed px-3 py-2 text-xs text-slate-500 dark:text-white/40" style={{ borderColor: 'var(--app-border-strong)' }}>
+                  No planets passing through on this day
+                </p>
+              )}
+            </Card>
+          </li>
+        ))}
+      </ul>
+      {shown.length === 0 && (
+        <p className="text-sm text-slate-500">No planets on this day.</p>
+      )}
     </>
   );
 }
@@ -1251,6 +990,7 @@ export default function TransitPanel({ chartId, natalLagna, accountEmail }: Prop
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -1272,6 +1012,14 @@ export default function TransitPanel({ chartId, natalLagna, accountEmail }: Prop
     setDayIndex(0);
   };
 
+  const applyPreset = (days: number) => {
+    const to = addDays(days);
+    setValue('from', today);
+    setValue('to', to);
+    setQueryParams({ from: today, to });
+    setDayIndex(0);
+  };
+
   const selectedDay = data?.days[dayIndex];
   const transitChartShape: ChartShape | null =
     selectedDay && data
@@ -1282,9 +1030,6 @@ export default function TransitPanel({ chartId, natalLagna, accountEmail }: Prop
         }
       : null;
 
-  const houseInfoByHouse = data
-    ? new Map((data.houseInfo ?? []).map(h => [h.house, h]))
-    : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -1298,212 +1043,164 @@ export default function TransitPanel({ chartId, natalLagna, accountEmail }: Prop
         onClose={() => setAiOpen(false)}
       />
 
-      {/* ── Transit basis toggle ── */}
-      <div className="flex items-center gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-600 dark:text-white/40">Transit Basis</span>
-        <div className="flex gap-1 rounded-lg border border-slate-200/90 dark:border-white/10 bg-slate-50/90 p-1 dark:bg-white/5">
-          {(['lagna', 'moon'] as const).map(b => (
-            <button
-              key={b}
-              type="button"
-              onClick={() => setBasis(b)}
-              className={[
-                'rounded-md px-4 py-1.5 text-xs font-semibold transition',
-                basis === b
-                  ? 'bg-amber-400 text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:bg-white/60 hover:text-slate-900 dark:text-white/55 dark:hover:bg-transparent dark:hover:text-white/90',
-              ].join(' ')}
-            >
-              {b === 'lagna' ? 'Lagna' : 'Moon'}
-            </button>
-          ))}
+      {/* ── Controls ── */}
+      <Card className="flex flex-col gap-4">
+        <div>
+          <p className="mb-1.5 text-sm font-medium">Count houses from</p>
+          <Segmented
+            ariaLabel="Transit basis"
+            value={basis}
+            onChange={setBasis}
+            options={[
+              { value: 'moon', label: 'Moon sign' },
+              { value: 'lagna', label: 'Ascendant' },
+            ]}
+          />
         </div>
-        <span className="text-[11px] text-slate-500 dark:text-white/30">
-          {basis === 'lagna' ? 'Houses counted from Ascendant' : 'Houses counted from Moon sign (Chandra Lagna)'}
-        </span>
-      </div>
 
-      {/* ── Compact date range form ── */}
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium uppercase tracking-wider text-slate-600 dark:text-white/40">From</label>
-          <input
-            type="date"
-            {...register('from')}
-            className="rounded-lg border border-slate-300 dark:border-white/15 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400/30 [color-scheme:light] dark:bg-slate-900/60 dark:text-white/90 dark:[color-scheme:dark]"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium uppercase tracking-wider text-slate-600 dark:text-white/40">To</label>
-          <input
-            type="date"
-            {...register('to')}
-            className="rounded-lg border border-slate-300 dark:border-white/15 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400/30 [color-scheme:light] dark:bg-slate-900/60 dark:text-white/90 dark:[color-scheme:dark]"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="self-end rounded-lg bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-[0_0_12px_rgba(251,191,36,0.2)] transition hover:bg-amber-300 disabled:opacity-50">
-          {isLoading ? '…' : 'Calculate'}
-        </button>
-        {(errors.from || errors.to) && (
-          <p className="w-full text-xs text-red-400">{errors.from?.message ?? errors.to?.message}</p>
-        )}
-      </form>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+          <div>
+            <p className="mb-1.5 text-sm font-medium">Period</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PRESETS.map(pr => {
+                const active = queryParams.from === today && queryParams.to === addDays(pr.days);
+                return (
+                  <button
+                    key={pr.label}
+                    type="button"
+                    onClick={() => applyPreset(pr.days)}
+                    className={[
+                      'min-h-10 rounded-xl px-2 text-sm font-semibold ring-1 ring-inset transition',
+                      active
+                        ? 'bg-amber-400/20 text-amber-900 ring-amber-400/60 dark:text-amber-200'
+                        : 'text-slate-600 ring-slate-300/60 hover:ring-amber-400/50 dark:text-white/60 dark:ring-white/10',
+                    ].join(' ')}
+                  >
+                    {pr.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <details className="group">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-xl px-1 text-sm font-medium text-slate-600 dark:text-white/60">
+              <span>Custom dates · {prettyDate(queryParams.from)} → {prettyDate(queryParams.to)}</span>
+              <span aria-hidden className="transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-2 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500 dark:text-white/50">From</span>
+                <input type="date" {...register('from')} className="app-input [color-scheme:light] dark:[color-scheme:dark]" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500 dark:text-white/50">To</span>
+                <input type="date" {...register('to')} className="app-input [color-scheme:light] dark:[color-scheme:dark]" />
+              </label>
+              <button type="submit" disabled={isLoading} className="btn btn-primary min-[400px]:col-span-2">
+                {isLoading ? 'Calculating…' : 'Show transits'}
+              </button>
+            </div>
+            {(errors.from || errors.to) && (
+              <p className="mt-2 text-xs text-red-500">{errors.from?.message ?? errors.to?.message}</p>
+            )}
+          </details>
+        </form>
+      </Card>
 
       {/* ── Error ── */}
       {isError && (
-        <p className="rounded-xl bg-red-500/20 p-4 text-sm text-red-200">
+        <p role="alert" className="rounded-xl border border-red-300/60 bg-red-50 p-4 text-sm text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200">
           Failed to load transit data. Please try again.
         </p>
       )}
 
-      {/* ── Spinner ── */}
+      {/* ── Loading ── */}
       {isLoading && (
-        <div className="flex flex-col items-center justify-center gap-4 py-20">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-400 border-t-transparent shadow-[0_0_20px_rgba(251,191,36,0.3)]" />
-          <p className="text-sm text-slate-600 dark:text-white/40">Calculating transits…</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-36" />)}
         </div>
       )}
 
       {/* ── Results ── */}
       {data && !isLoading && (
         <>
-          {/* Sticky date-slider + view toggle bar */}
-          <div className="sticky top-12 z-20 -mx-4 mb-2 rounded-none border-y border-slate-200/90 dark:border-white/10 bg-white/96 dark:bg-slate-950/90 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border">
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={0}
-                max={data.days.length - 1}
-                value={dayIndex}
-                onChange={e => setDayIndex(Number(e.target.value))}
-                className="flex-1 accent-amber-400"
-              />
-              <span className="shrink-0 rounded-md bg-white/10 px-3 py-1 text-sm font-medium tabular-nums text-amber-300">
-                {selectedDay?.date}
-              </span>
-              {/* View toggle */}
-              <div className="flex shrink-0 gap-1 rounded-lg border border-slate-200/90 dark:border-white/10 bg-white/5 p-1">
-                {(['chart', 'houses', 'table'] as const).map(v => (
-                  <button key={v} type="button" onClick={() => setView(v)}
-                    className={[
-                      'rounded-md px-3 py-1 text-xs font-medium transition',
-                      view === v ? 'bg-amber-400 text-slate-900 shadow-sm' : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:text-white/90',
-                    ].join(' ')}>
-                    {v === 'chart' ? 'Chart' : v === 'houses' ? 'Houses' : 'Table'}
-                  </button>
-                ))}
+          {/* Day scrubber: big prev/next buttons + full-width slider, never overflows */}
+          <div
+            className="sticky top-14 z-20 -mx-4 border-y px-4 py-3 backdrop-blur-xl sm:mx-0 sm:rounded-2xl sm:border"
+            style={{ background: 'var(--nav-bg)', borderColor: 'var(--app-border)' }}
+          >
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous day"
+                disabled={dayIndex <= 0}
+                onClick={() => setDayIndex(i => Math.max(0, i - 1))}
+                className="btn btn-secondary h-11 w-11 shrink-0 !p-0 text-lg"
+              >
+                ‹
+              </button>
+              <div className="min-w-0 flex-1 text-center">
+                <p className="truncate font-display text-lg font-semibold">{selectedDay ? prettyDate(selectedDay.date, true) : ''}</p>
+                <p className="text-[11px] text-slate-500 dark:text-white/45">
+                  Day {dayIndex + 1} of {data.days.length}
+                  {dayIndex !== 0 && (
+                    <button type="button" onClick={() => setDayIndex(0)} className="ml-2 font-semibold text-amber-700 dark:text-amber-300">
+                      Back to start
+                    </button>
+                  )}
+                </p>
               </div>
+              <button
+                type="button"
+                aria-label="Next day"
+                disabled={dayIndex >= data.days.length - 1}
+                onClick={() => setDayIndex(i => Math.min(data.days.length - 1, i + 1))}
+                className="btn btn-secondary h-11 w-11 shrink-0 !p-0 text-lg"
+              >
+                ›
+              </button>
             </div>
-            <div className="mt-1 flex justify-between text-[10px] text-slate-500 dark:text-white/30">
-              <span>{data.from}</span>
-              <span>{data.to}</span>
-            </div>
+            <input
+              type="range"
+              min={0}
+              max={data.days.length - 1}
+              value={dayIndex}
+              onChange={e => setDayIndex(Number(e.target.value))}
+              aria-label="Pick a day in the period"
+              className="mt-2 h-8 w-full accent-amber-500"
+            />
           </div>
+
+          {/* View switch on its own row: equal-width, always fits */}
+          <Segmented
+            ariaLabel="Transit view"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'chart', label: 'Chart' },
+              { value: 'houses', label: 'Houses' },
+              { value: 'table', label: 'Planets' },
+            ]}
+          />
 
           {/* Chart view */}
           {view === 'chart' && transitChartShape && selectedDay && (
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-              {/* Transit diamond chart */}
-              <div className="flex flex-col gap-3 lg:w-[420px] lg:shrink-0">
-                <div className="w-full rounded-2xl border border-cyan-400/20 bg-gradient-to-b from-slate-100/95 to-slate-50/90 dark:from-white/[0.07] dark:to-white/[0.03] p-4 shadow-xl backdrop-blur-md">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="border-l-2 border-cyan-400/50 pl-2 text-xs font-medium uppercase tracking-widest text-cyan-400/60">
-                      Transit Chart
-                    </span>
-                    <span className="text-xs text-slate-500 dark:text-white/30">{selectedDay.date}</span>
-                  </div>
-                  <DiamondChart chart={transitChartShape} />
-                </div>
-                <p className="text-center text-xs text-slate-500 dark:text-white/30">
-                  Houses from {basis === 'moon' ? 'Moon sign (Chandra Lagna)' : 'Ascendant (Lagna)'}{' '}
-                  <span className="text-slate-500 dark:text-white/50">({data.natalLagna.sign})</span>
+            <div className="flex flex-col gap-4">
+              <Card className="mx-auto w-full max-w-[460px] !p-3 sm:!p-4">
+                <DiamondChart chart={transitChartShape} />
+                <p className="mt-2 text-center text-xs text-slate-500 dark:text-white/45">
+                  Houses from {basis === 'moon' ? 'Moon sign' : 'Ascendant'} ({data.natalLagna.sign})
                 </p>
-              </div>
-
-              {/* Transit positions */}
-              <div className="flex-1 min-w-0 rounded-2xl border border-slate-200 dark:border-white/[0.12] bg-gradient-to-b from-slate-100/95 to-slate-50/90 dark:from-white/[0.07] dark:to-white/[0.03] px-5 py-5 backdrop-blur-md">
-                <div className="mb-3">
-                  <p className="border-l-2 border-amber-400/50 pl-3 text-xs font-medium uppercase tracking-widest text-slate-600 dark:text-white/40">
-                    Transit Positions — {selectedDay.date}
-                  </p>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 dark:text-white/35">
-                    <span className="text-slate-500 dark:text-white/50">vs lord</span> is the natural (naisargika) relationship of the transiting planet to the sign lord.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {selectedDay.planets.map(p => {
-                    const dignityKey = p.dignity.includes('exalted')     ? 'exalted'
-                      : p.dignity.includes('debilitated') ? 'debilitated'
-                      : p.dignity.includes('own')         ? 'own'          : 'neutral';
-                    const hi = houseInfoByHouse?.get(p.house);
-                    const rel = hi?.planetRelationships?.[p.planet] ?? 'neutral';
-                    const lordSym = hi?.signLord ? (PLANET_SYMBOL[hi.signLord] ?? '') : '';
-                    return (
-                      <div
-                        key={p.planet}
-                        className="rounded-xl border border-slate-200/70 dark:border-white/8 bg-white/[0.03] px-3 py-3 transition-colors duration-150 hover:bg-white/[0.05] sm:px-4"
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <span className="text-xl text-slate-700 dark:text-white/70">{PLANET_SYMBOL[p.planet] ?? ''}</span>
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                <span className="text-sm font-semibold text-slate-900 dark:text-white/90">{p.planet}</span>
-                                {p.isRetrograde && (
-                                  <span className="rounded bg-red-400/20 px-1 py-0.5 text-[10px] text-red-300">℞</span>
-                                )}
-                              </div>
-                              <p className="mt-0.5 text-[11px] text-slate-600 dark:text-white/40">
-                                House {p.house} <span className="text-slate-400 dark:text-white/25">·</span> from Moon
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm sm:justify-end">
-                            <div className="min-w-0">
-                              <p className="font-medium text-indigo-200">
-                                {p.sign}{' '}
-                                <span className="tabular-nums text-xs font-normal text-slate-500 dark:text-white/45">
-                                  {p.degreeInSign.toFixed(1)}°
-                                </span>
-                              </p>
-                              {SIGN_ELEMENT[p.sign] && (
-                                <span className={`inline-block rounded px-1.5 text-[10px] font-medium ${SIGN_ELEMENT[p.sign].cls}`}>
-                                  {SIGN_ELEMENT[p.sign].label} element
-                                </span>
-                              )}
-                              {hi?.signLord && (
-                                <p className="mt-0.5 text-[11px] text-cyan-300/85">
-                                  Lord {lordSym} {hi.signLord}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-end gap-1 sm:items-center sm:text-center" title={REL_TO_LORD_HINT[rel]}>
-                              <span className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-white/30">vs lord</span>
-                              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize ${REL_BADGE[rel]}`}>
-                                {rel}
-                              </span>
-                            </div>
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-white/30">dignity</span>
-                              <span className={`rounded-full px-2.5 py-0.5 text-[11px] capitalize ${DIGNITY_BADGE[dignityKey]}`}>
-                                {dignityKey}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              </Card>
+              <TransitTable
+                transitPlanets={selectedDay.planets}
+                natalPlanets={data.natalPlanets}
+                houseInfo={data.houseInfo ?? []}
+              />
             </div>
           )}
 
-          {/* Table view */}
+          {/* Planets view */}
           {view === 'table' && selectedDay && (
             <TransitTable
               transitPlanets={selectedDay.planets}

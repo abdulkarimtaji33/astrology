@@ -16,6 +16,8 @@ import PlanetRelationshipsPanel from '@/components/PlanetRelationshipsPanel';
 import SaturnPanel from '@/components/SaturnPanel';
 import AiAnalysisModal, { AiAnalysisResult } from '@/components/AiAnalysisModal';
 import AstroSummaryStrip from '@/components/AstroSummaryStrip';
+import { useDialog } from '@/lib/use-dialog';
+import { Segmented } from '@/components/placement-ui';
 
 interface PlanetPosition {
   planet: string;
@@ -89,6 +91,7 @@ function EditBirthModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  useDialog(onClose);
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime.slice(0, 5));
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -176,6 +179,7 @@ function DeleteConfirmModal({
   onClose: () => void;
   onDeleted: () => void;
 }) {
+  useDialog(onClose);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -283,22 +287,16 @@ function ChartSection({
 
       {/* Right */}
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <div className="grid grid-cols-2 gap-1 rounded-2xl border p-1 sm:inline-grid sm:w-64" style={{ borderColor: 'var(--app-border)', background: 'rgba(127,127,127,.08)' }}>
-          {(['houses', 'planets'] as TableView[]).map(v => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={[
-                'min-h-10 rounded-xl px-4 text-sm font-semibold transition',
-                view === v
-                  ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-slate-900 shadow'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90',
-              ].join(' ')}
-            >
-              {v === 'houses' ? 'Houses' : 'Planets'}
-            </button>
-          ))}
+        <div className="sm:w-72">
+          <Segmented<TableView>
+            ariaLabel="Show houses or planets"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'houses', label: 'By house' },
+              { value: 'planets', label: 'By planet' },
+            ]}
+          />
         </div>
         {view === 'houses' && chart.houseDetails ? (
           <HouseTable houses={chart.houseDetails} chartId={chartId} chartKind={chartKind} />
@@ -354,15 +352,17 @@ export default function ChartPage() {
     }
   };
 
+  // Open the tab named in the URL hash (deep links, back/forward, in-page links).
   useEffect(() => {
-    const h = window.location.hash.replace('#', '') as ChartTab;
-    if (h && h in TAB_META) setActiveTabState(h);
+    const sync = () => {
+      const h = window.location.hash.replace('#', '') as ChartTab;
+      if (h && h in TAB_META) setActiveTabState(h);
+    };
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
   }, []);
 
-  useEffect(() => {
-    const el = tabBarRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-  }, [activeTab]);
 
   const canFetch = Boolean(user && id);
 
@@ -512,26 +512,36 @@ export default function ChartPage() {
             )}
           </div>
           {!accessDenied && (
-            <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 onClick={runGlobalAi}
                 disabled={aiLoading}
-                className="btn btn-primary col-span-2 sm:order-last"
+                className="btn btn-primary flex-1 sm:order-last sm:flex-none"
               >
                 <span aria-hidden>✦</span> Analyze with AI
               </button>
               {summary && (
                 <>
-                  <button type="button" onClick={() => setEditOpen(true)} className="btn btn-secondary">
-                    ✎ Edit
+                  <button
+                    type="button"
+                    onClick={() => setEditOpen(true)}
+                    aria-label="Edit birth date and time"
+                    title="Edit birth date and time"
+                    className="btn btn-secondary w-11 !px-0 sm:w-auto sm:!px-4"
+                  >
+                    <span aria-hidden>✎</span>
+                    <span className="hidden sm:inline">Edit</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeleteOpen(true)}
-                    className="btn btn-secondary !text-red-600 hover:!border-red-400 dark:!text-red-300"
+                    aria-label="Delete chart"
+                    title="Delete chart"
+                    className="btn btn-secondary w-11 !px-0 !text-red-600 hover:!border-red-400 sm:w-auto sm:!px-4 dark:!text-red-300"
                   >
-                    🗑 Delete
+                    <span aria-hidden>🗑</span>
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
                 </>
               )}
@@ -555,38 +565,37 @@ export default function ChartPage() {
             {/* Astro summary strip — always visible */}
             {id && <div className="mb-6"><AstroSummaryStrip chartId={id} /></div>}
 
-            {/* Tab bar — sticky, scrollable, full labels */}
+            {/* Section picker: every section visible at once (3×2 on phones, 1×6 on larger screens). No sideways scrolling. */}
             <div
-              className="sticky top-14 z-30 -mx-4 mb-6 border-y px-4 backdrop-blur-xl sm:mx-0 sm:rounded-2xl sm:border sm:px-2"
-              style={{ background: 'var(--nav-bg)', borderColor: 'var(--app-border)' }}
+              ref={tabBarRef}
+              role="tablist"
+              aria-label="Chart sections"
+              className="mb-2 grid grid-cols-3 gap-2 md:sticky md:top-14 md:z-30 md:grid-cols-6 md:rounded-2xl md:border md:p-1.5 md:backdrop-blur-xl"
+              style={{ borderColor: 'var(--app-border)' }}
             >
-              <div
-                ref={tabBarRef}
-                role="tablist"
-                aria-label="Chart sections"
-                className="scrollbar-hide flex snap-x gap-1 overflow-x-auto py-2"
-              >
-                {(['lagna', 'moon', 'transit', 'numerology', 'relationships', 'saturn'] as ChartTab[]).map(tab => (
+              {(['lagna', 'moon', 'transit', 'numerology', 'relationships', 'saturn'] as ChartTab[]).map(tab => {
+                const active = activeTab === tab;
+                return (
                   <button
                     key={tab}
                     type="button"
                     role="tab"
-                    aria-selected={activeTab === tab}
+                    aria-selected={active}
                     onClick={() => setActiveTab(tab)}
                     className={[
-                      'flex min-h-11 shrink-0 snap-center items-center gap-2 rounded-xl px-4 text-sm font-semibold transition',
-                      activeTab === tab
-                        ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-slate-900 shadow-md shadow-amber-500/25'
-                        : 'text-slate-600 hover:bg-slate-500/10 dark:text-white/60 dark:hover:text-white',
+                      'flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-xs font-semibold ring-1 ring-inset transition md:min-h-11 md:flex-row md:gap-2 md:text-sm md:ring-0',
+                      active
+                        ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-slate-900 shadow-md shadow-amber-500/25 ring-amber-400'
+                        : 'text-slate-600 ring-slate-300/60 hover:bg-slate-500/10 dark:text-white/65 dark:ring-white/10 dark:hover:text-white',
                     ].join(' ')}
                   >
-                    <span aria-hidden className="text-base leading-none">{TAB_META[tab].icon}</span>
-                    {TAB_META[tab].label}
+                    <span aria-hidden className="text-xl leading-none md:text-base">{TAB_META[tab].icon}</span>
+                    <span className="max-w-full truncate">{TAB_META[tab].label}</span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-            <p className="-mt-3 mb-5 text-xs text-slate-500 dark:text-white/40">{TAB_META[activeTab].desc}</p>
+            <p className="mb-5 text-xs text-slate-500 dark:text-white/40">{TAB_META[activeTab].desc}</p>
 
             {lagnaError && (
               <p className="rounded-xl bg-red-100 p-4 text-red-800 dark:bg-red-500/20 dark:text-red-200">

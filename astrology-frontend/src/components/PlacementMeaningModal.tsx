@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useDialog } from '@/lib/use-dialog';
 
 const PLANET_SYMBOL: Record<string, string> = {
   Sun: '☉', Moon: '☽', Mercury: '☿', Venus: '♀',
@@ -74,6 +75,7 @@ export default function PlacementMeaningModal({
   payload: PlacementMeaningPayload;
   onClose: () => void;
 }) {
+  useDialog(onClose);
   const { planet, house, sign } = payload;
 
   const { data, isLoading, isError } = useQuery<PlacementMeaningResponse>({

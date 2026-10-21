@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import api from '@/lib/api';
 
 interface NameNumerologyResult {
@@ -74,7 +73,7 @@ function ChaldeanLetterTable({ activeLetters }: { activeLetters: Set<string> }) 
         </tbody>
       </table>
       <p className="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-white/40">
-        9 is never assigned to a letter in the Chaldean system — it's reserved as a sacred number.
+        9 is never assigned to a letter in the Chaldean system — it&apos;s reserved as a sacred number.
       </p>
     </section>
   );
@@ -130,7 +129,7 @@ export default function NameNumerologyPage() {
             radial-gradient(circle at 80% 20%, var(--glow-1) 0%, transparent 50%)`,
         }}
       />
-      <main className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -140,12 +139,6 @@ export default function NameNumerologyPage() {
               Chaldean name number calculator, plus .com domain availability.
             </p>
           </div>
-          <Link
-            href="/"
-            className="shrink-0 rounded-lg border border-slate-300/90 px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/20 dark:text-white/70 dark:hover:bg-white/10"
-          >
-            ← Birth chart
-          </Link>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
@@ -158,17 +151,17 @@ export default function NameNumerologyPage() {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Amelia"
-                  className="app-input py-2 text-sm dark:bg-slate-900/80 dark:text-white"
+                  className="app-input dark:bg-slate-900/80 dark:text-white"
                   required
                 />
               </label>
 
-              <label className="mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-white/60">
+              <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm text-slate-600 dark:text-white/60">
                 <input
                   type="checkbox"
                   checked={checkDomain}
                   onChange={e => setCheckDomain(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 dark:border-white/20"
+                  className="h-5 w-5 rounded border-slate-300 accent-amber-500 dark:border-white/20"
                 />
                 Also check .com domain availability
               </label>
@@ -176,7 +169,7 @@ export default function NameNumerologyPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-4 rounded-lg border border-amber-500/50 bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50 dark:border-amber-400/50 dark:bg-amber-400/15 dark:text-amber-200 dark:hover:bg-amber-400/25"
+                className="btn btn-primary mt-4 min-h-12 w-full sm:w-auto"
               >
                 {loading ? 'Calculating…' : 'Calculate'}
               </button>
@@ -233,7 +226,7 @@ export default function NameNumerologyPage() {
 
           <ChaldeanLetterTable activeLetters={activeLetters} />
         </div>
-      </main>
+      </div>
     </div>
   );
 }

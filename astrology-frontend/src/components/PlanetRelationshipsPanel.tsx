@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 
@@ -73,8 +74,8 @@ export default function PlanetRelationshipsPanel() {
   return (
     <div className="flex flex-col gap-8">
 
-      {/* ── Matrix ── */}
-      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white/85 dark:bg-white/5 p-5 overflow-x-auto">
+      {/* ── Matrix: a 9×9 grid can't fit a phone, so phones get the per-planet cards below instead ── */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200/90 bg-white/85 p-5 md:block dark:border-white/10 dark:bg-white/5">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-white/40">
           Naisargika Maitri · Natural Friendship Matrix
         </h3>
@@ -94,9 +95,9 @@ export default function PlanetRelationshipsPanel() {
 
           {/* Data rows */}
           {planets.map(row => (
-            <>
+            <Fragment key={row}>
               {/* Row label */}
-              <div key={`label-${row}`} className="flex items-center gap-2 pr-2">
+              <div className="flex items-center gap-2 pr-2">
                 <span className={`text-base ${PLANET_COLOR[row] ?? 'text-white'}`}>{PLANET_SYMBOL[row] ?? row[0]}</span>
                 <span className="text-xs text-slate-700 dark:text-white/70">{row}</span>
               </div>
@@ -109,7 +110,7 @@ export default function PlanetRelationshipsPanel() {
                   isSelf={row === col}
                 />
               ))}
-            </>
+            </Fragment>
           ))}
         </div>
 

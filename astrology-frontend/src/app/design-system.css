@@ -302,11 +302,11 @@ html:not(.dark) .gold-text {
 
 /* Every modal/dialog becomes a bottom sheet on phones */
 @media (max-width: 639px) {
-  .fixed.inset-0.z-50.items-center {
+  .fixed.inset-0.items-center {
     align-items: flex-end !important;
     padding: 0 !important;
   }
-  .fixed.inset-0.z-50.items-center > .relative {
+  .fixed.inset-0.items-center > .relative {
     max-width: 100% !important;
     width: 100% !important;
     border-bottom-left-radius: 0 !important;
@@ -340,4 +340,12 @@ html:not(.dark) .gold-text {
   html {
     scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }
+}
+
+/* Buttons inside any dialog/sheet are at least 40px so they are easy to hit with a thumb */
+.fixed.inset-0 button:not(.absolute) {
+  min-height: 2.5rem;
+}
+.fixed.inset-0 button:not(.absolute):not(:has(*)) {
+  min-width: 2.5rem;
 }

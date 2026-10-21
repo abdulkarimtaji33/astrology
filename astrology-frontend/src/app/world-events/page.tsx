@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import api from '@/lib/api';
+import { isAxiosError } from 'axios';
 
 interface PlanetState {
   planet: string;
@@ -89,12 +89,12 @@ const TOPIC_ICONS: Record<string, string> = {
 export default function WorldEventsPage() {
   const [{ from, to }, setRange] = useState(defaultRange);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<WorldEventsResult | null>(null);
 
   const run = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(false);
+    setError(null);
     setData(null);
     setLoading(true);
     try {
@@ -103,8 +103,17 @@ export default function WorldEventsPage() {
         { timeout: 10 * 60 * 1000 },
       );
       setData(res.data);
-    } catch {
-      setError(true);
+    } catch (err: unknown) {
+      const status = isAxiosError(err) ? err.response?.status : undefined;
+      const raw = isAxiosError(err) ? (err.response?.data as { message?: unknown } | undefined)?.message : undefined;
+      const msg = typeof raw === 'string' ? raw : '';
+      if (/credit|quota|billing|rate limit|429/i.test(msg)) {
+        setError('The AI service is unavailable right now (usage limit reached). Please try again later.');
+      } else if (!status) {
+        setError('Could not reach the server. Check your connection and try again.');
+      } else {
+        setError('Something went wrong while predicting. Please try a shorter date range or try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -119,7 +128,7 @@ export default function WorldEventsPage() {
             radial-gradient(circle at 80% 20%, var(--glow-1) 0%, transparent 50%)`,
         }}
       />
-      <main className="relative mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div className="relative mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -129,12 +138,6 @@ export default function WorldEventsPage() {
               Mundane Vedic transit analysis — conjunctions, aspects, combustion.
             </p>
           </div>
-          <Link
-            href="/"
-            className="shrink-0 rounded-lg border border-slate-300/90 px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/20 dark:text-white/70 dark:hover:bg-white/10"
-          >
-            ← Birth chart
-          </Link>
         </div>
 
         <form
@@ -148,7 +151,7 @@ export default function WorldEventsPage() {
                 type="date"
                 value={from}
                 onChange={e => setRange(r => ({ ...r, from: e.target.value }))}
-                className="app-input py-2 text-sm [color-scheme:light] dark:bg-slate-900/80 dark:text-white dark:[color-scheme:dark]"
+                className="app-input [color-scheme:light] dark:bg-slate-900/80 dark:text-white dark:[color-scheme:dark]"
                 required
               />
             </label>
@@ -158,14 +161,14 @@ export default function WorldEventsPage() {
                 type="date"
                 value={to}
                 onChange={e => setRange(r => ({ ...r, to: e.target.value }))}
-                className="app-input py-2 text-sm [color-scheme:light] dark:bg-slate-900/80 dark:text-white dark:[color-scheme:dark]"
+                className="app-input [color-scheme:light] dark:bg-slate-900/80 dark:text-white dark:[color-scheme:dark]"
                 required
               />
             </label>
             <button
               type="submit"
               disabled={loading}
-              className="rounded-lg border border-amber-500/50 bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50 dark:border-amber-400/50 dark:bg-amber-400/15 dark:text-amber-200 dark:hover:bg-amber-400/25"
+              className="btn btn-primary min-h-12 sm:min-h-11"
             >
               {loading ? 'Analyzing…' : 'Predict'}
             </button>
@@ -173,8 +176,8 @@ export default function WorldEventsPage() {
         </form>
 
         {error && (
-          <p className="rounded-xl bg-red-100 p-4 text-red-900 dark:bg-red-500/20 dark:text-red-200">
-            Request failed. Check dates and API key.
+          <p role="alert" className="mb-6 rounded-xl border border-red-300/60 bg-red-50 p-4 text-sm text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200">
+            {error}
           </p>
         )}
 
@@ -333,7 +336,7 @@ export default function WorldEventsPage() {
             )}
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
