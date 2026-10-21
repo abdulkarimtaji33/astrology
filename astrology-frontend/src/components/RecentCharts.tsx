@@ -41,59 +41,58 @@ function formatBirthDate(raw: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const sectionTitle =
-  'border-l-2 border-amber-500/70 pl-3 text-xs font-medium uppercase tracking-widest text-slate-500 dark:border-amber-400/50 dark:text-white/40';
-
-function InlineDeleteButton({ id, name }: { id: number; name: string }) {
+function DeleteButton({ id, name }: { id: number; name: string }) {
   const queryClient = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
   const doDelete = async () => {
     setLoading(true);
     try {
       await api.delete(`/birth-records/${id}`);
       void queryClient.invalidateQueries({ queryKey: ['my-charts'] });
+      setOpen(false);
     } catch {
       setLoading(false);
-      setConfirming(false);
     }
   };
 
-  if (confirming) {
-    return (
-      <div ref={ref} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300/60 bg-red-50 px-2.5 py-1.5 dark:border-red-400/30 dark:bg-red-500/10">
-        <span className="text-xs text-red-700 dark:text-red-400">Delete {name}?</span>
-        <button
-          type="button"
-          onClick={doDelete}
-          disabled={loading}
-          className="rounded px-2 py-0.5 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-500/20"
-        >
-          {loading ? '…' : 'Yes'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          className="rounded px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100 dark:text-white/40 dark:hover:bg-white/5"
-        >
-          No
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <button
-      type="button"
-      onClick={() => setConfirming(true)}
-      title="Delete chart"
-      className="shrink-0 rounded-lg border border-transparent p-1.5 text-slate-400 transition hover:border-red-300/50 hover:bg-red-50 hover:text-red-600 dark:text-white/25 dark:hover:border-red-400/30 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-    >
-      🗑
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`Delete ${name}`}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-red-500/10 hover:text-red-500"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+        </svg>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <button type="button" aria-label="Cancel" className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="app-card relative z-10 w-full max-w-sm p-6 text-center !bg-white dark:!bg-slate-900">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15 text-xl">🗑</div>
+            <h3 className="text-xl font-semibold">Delete this chart?</h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-white/55">
+              <span className="font-semibold">{name}</span> will be permanently removed.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={() => setOpen(false)} className="btn btn-secondary flex-1">Keep it</button>
+              <button type="button" onClick={doDelete} disabled={loading} className="btn btn-danger flex-1">
+                {loading ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
+}
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '✦';
 }
 
 export default function RecentCharts() {
@@ -105,57 +104,64 @@ export default function RecentCharts() {
   });
 
   if (!user) return null;
+
+  const header = (
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <div>
+        <p className="eyebrow">Saved</p>
+        <h2 className="text-2xl font-semibold">My charts</h2>
+      </div>
+      {data && data.length > 0 && <span className="chip">{data.length}</span>}
+    </div>
+  );
+
   if (authLoading || isLoading) {
     return (
-      <div className="flex flex-col gap-3">
-        <p className={sectionTitle}>My charts</p>
-        <div className="h-20 animate-pulse rounded-xl border border-slate-200/80 bg-white/50 dark:border-white/10 dark:bg-white/[0.04]" />
+      <div>
+        {header}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map(i => <div key={i} className="skeleton h-20" />)}
+        </div>
       </div>
     );
   }
 
   if (!data?.length) {
     return (
-      <div className="flex flex-col gap-3">
-        <p className={sectionTitle}>My charts</p>
-        <div className="rounded-xl border border-dashed border-slate-300/90 bg-white/50 px-4 py-6 text-center dark:border-white/15 dark:bg-white/[0.03]">
-          <p className="text-sm text-slate-600 dark:text-white/45">No saved charts yet.</p>
-          <p className="mt-1 text-xs text-slate-400 dark:text-white/30">Add birth details to create your first one.</p>
+      <div>
+        {header}
+        <div className="rounded-2xl border border-dashed px-6 py-10 text-center" style={{ borderColor: 'var(--app-border-strong)' }}>
+          <p className="text-3xl" aria-hidden>✦</p>
+          <p className="mt-2 font-semibold">No saved charts yet</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-white/50">Fill in your birth details above to create your first chart.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className={sectionTitle}>My charts</p>
-      <div className="flex flex-col gap-2">
+    <div>
+      {header}
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.map(row => (
-          <div
-            key={row.id}
-            className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 px-4 py-3 shadow-sm transition hover:border-amber-300/50 dark:border-white/10 dark:from-white/[0.07] dark:to-white/[0.03] dark:shadow-none dark:hover:border-white/20"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900 dark:text-white/90">{row.name}</p>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-white/40">
-                {formatBirthDate(row.birthDate)}
-                {row.cityName && (
-                  <span className="ml-2 text-slate-400 dark:text-white/30">· {row.cityName}</span>
-                )}
-              </p>
-            </div>
-            <div className="ml-3 flex shrink-0 items-center gap-2">
-              <InlineDeleteButton id={row.id} name={row.name} />
-              <Link
-                href={`/chart/${row.id}`}
-                className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300 dark:hover:border-amber-400/50 dark:hover:bg-amber-400/20"
-              >
-                Open →
-              </Link>
-            </div>
-          </div>
+          <li key={row.id} className="app-card flex items-center gap-1 p-2 pr-1 transition hover:-translate-y-0.5" style={{ border: '1px solid var(--app-border)' }}>
+            <Link href={`/chart/${row.id}`} className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-1.5">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 to-amber-600 text-sm font-bold text-slate-900">
+                {initials(row.name)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{row.name}</span>
+                <span className="block truncate text-xs text-slate-500 dark:text-white/45">
+                  {formatBirthDate(row.birthDate)}
+                  {row.cityName ? ` · ${row.cityName}` : ''}
+                </span>
+              </span>
+              <span aria-hidden className="ml-auto pl-2 text-slate-400">›</span>
+            </Link>
+            <DeleteButton id={row.id} name={row.name} />
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

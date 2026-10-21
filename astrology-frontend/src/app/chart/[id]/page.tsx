@@ -247,12 +247,12 @@ function ChartSection({
   const [view, setView] = useState<TableView>('houses');
 
   return (
-    <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+    <div className="fade-up flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
       <div className="flex flex-col items-center gap-4 lg:w-[420px] lg:shrink-0">
-        <div className="w-full rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-md backdrop-blur-md dark:border-white/[0.12] dark:from-white/[0.07] dark:to-white/[0.03] dark:shadow-xl">
+        <div className="app-card mx-auto w-full max-w-[460px] p-3 sm:p-4" style={{ border: "1px solid var(--app-border)" }}>
           <LagnaChartSVG chart={chart} />
         </div>
-        <div className="w-full rounded-xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/80 px-5 py-4 dark:border-white/[0.12] dark:from-white/[0.07] dark:to-white/[0.03]">
+        <div className="app-card w-full px-5 py-4" style={{ border: "1px solid var(--app-border)" }}>
           <p className="border-l-2 border-amber-500/60 pl-2 text-xs font-medium uppercase tracking-widest text-slate-500 dark:border-amber-400/50 dark:text-white/40">
             {lagnaLabel}
           </p>
@@ -283,16 +283,16 @@ function ChartSection({
 
       {/* Right */}
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <div className="flex gap-1 self-start rounded-lg border border-slate-200/90 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-white/5">
+        <div className="grid grid-cols-2 gap-1 rounded-2xl border p-1 sm:inline-grid sm:w-64" style={{ borderColor: 'var(--app-border)', background: 'rgba(127,127,127,.08)' }}>
           {(['houses', 'planets'] as TableView[]).map(v => (
             <button
               key={v}
               type="button"
               onClick={() => setView(v)}
               className={[
-                'rounded-md px-4 py-1.5 text-xs font-medium transition',
+                'min-h-10 rounded-xl px-4 text-sm font-semibold transition',
                 view === v
-                  ? 'bg-amber-500 text-white shadow-md dark:bg-amber-400 dark:text-slate-900 dark:shadow-amber-400/20'
+                  ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-slate-900 shadow'
                   : 'text-slate-600 hover:text-slate-900 dark:text-white/60 dark:hover:text-white/90',
               ].join(' ')}
             >
@@ -341,8 +341,28 @@ export default function ChartPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<ChartTab>('lagna');
+  const [activeTab, setActiveTabState] = useState<ChartTab>('lagna');
   const queryClient = useQueryClient();
+  const tabBarRef = useRef<HTMLDivElement>(null);
+
+  const setActiveTab = (t: ChartTab) => {
+    setActiveTabState(t);
+    try {
+      window.history.replaceState(null, '', `#${t}`);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    const h = window.location.hash.replace('#', '') as ChartTab;
+    if (h && h in TAB_META) setActiveTabState(h);
+  }, []);
+
+  useEffect(() => {
+    const el = tabBarRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [activeTab]);
 
   const canFetch = Boolean(user && id);
 
@@ -434,16 +454,8 @@ export default function ChartPage() {
   }
 
   return (
-    <div className="app-shell overflow-hidden">
-      <div
-        className="app-shell-glow"
-        style={{
-          backgroundImage: `radial-gradient(ellipse at 20% 80%, var(--glow-2) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 20%, var(--glow-1) 0%, transparent 50%),
-            radial-gradient(ellipse at 60% 50%, var(--glow-3) 0%, transparent 50%)`,
-        }}
-      />
-      <main className="relative mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <div className="app-shell">
+      <div className="relative mx-auto w-full max-w-6xl px-4 pb-8 pt-5 sm:px-6 sm:pt-8">
 
         <AiAnalysisModal
           isOpen={aiOpen}
@@ -482,66 +494,47 @@ export default function ChartPage() {
         )}
 
         {/* header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="fade-up mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
+            <p className="eyebrow mb-1">Vedic birth chart</p>
             {summary ? (
               <>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-                  {summary.name}
-                </h1>
-                <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600 dark:text-white/55">
-                  <span className="tabular-nums">{summary.birthDate}</span>
-                  <span className="text-slate-300 dark:text-white/20">·</span>
-                  <span className="tabular-nums">{summary.birthTime}</span>
-                  {summary.cityName && (
-                    <>
-                      <span className="text-slate-300 dark:text-white/20">·</span>
-                      <span>{summary.cityName}</span>
-                    </>
-                  )}
-                  {summary.timezone && (
-                    <span className="text-slate-400 dark:text-white/35">({summary.timezone})</span>
-                  )}
-                </p>
+                <h1 className="truncate text-3xl font-semibold sm:text-4xl">{summary.name}</h1>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <span className="chip tabular-nums">📅 {summary.birthDate.slice(0, 10)}</span>
+                  <span className="chip tabular-nums">🕐 {summary.birthTime.slice(0, 5)}</span>
+                  {summary.cityName && <span className="chip">📍 {summary.cityName}</span>}
+                  {summary.timezone && <span className="chip hidden sm:inline-flex">{summary.timezone}</span>}
+                </div>
               </>
             ) : (
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-                Vedic Birth Chart
-              </h1>
+              <div className="skeleton h-10 w-56" />
             )}
-            <p className="mt-1 text-xs text-slate-500 dark:text-white/35">{TAB_META[activeTab].desc}</p>
           </div>
           {!accessDenied && (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
+              <button
+                type="button"
+                onClick={runGlobalAi}
+                disabled={aiLoading}
+                className="btn btn-primary col-span-2 sm:order-last"
+              >
+                <span aria-hidden>✦</span> Analyze with AI
+              </button>
               {summary && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setEditOpen(true)}
-                    title="Edit birth date & time"
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-300/80 bg-white/80 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-amber-400/60 hover:bg-amber-50 dark:border-white/15 dark:bg-white/5 dark:text-white/70 dark:hover:border-amber-400/40 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
-                  >
-                    ✎ Edit Date
+                  <button type="button" onClick={() => setEditOpen(true)} className="btn btn-secondary">
+                    ✎ Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeleteOpen(true)}
-                    title="Delete this chart"
-                    className="flex items-center gap-1.5 rounded-lg border border-red-300/60 bg-red-50/80 px-3 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:border-red-400 hover:bg-red-100 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:border-red-400/60 dark:hover:bg-red-500/20"
+                    className="btn btn-secondary !text-red-600 hover:!border-red-400 dark:!text-red-300"
                   >
                     🗑 Delete
                   </button>
                 </>
               )}
-              <button
-                type="button"
-                onClick={runGlobalAi}
-                disabled={aiLoading}
-                className="flex items-center gap-2 rounded-lg border border-violet-300/80 bg-violet-100/90 px-4 py-2 text-sm font-semibold text-violet-900 shadow-sm transition hover:border-violet-400 hover:bg-violet-200/50 disabled:opacity-50 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200 dark:shadow-[0_0_16px_rgba(139,92,246,0.1)] dark:hover:border-violet-400/60 dark:hover:bg-violet-500/25 dark:hover:shadow-[0_0_20px_rgba(139,92,246,0.2)]"
-              >
-                <span>✦</span>
-                Analyze with AI
-              </button>
             </div>
           )}
         </div>
@@ -562,30 +555,38 @@ export default function ChartPage() {
             {/* Astro summary strip — always visible */}
             {id && <div className="mb-6"><AstroSummaryStrip chartId={id} /></div>}
 
-            {/* Tab bar — scrollable on mobile */}
-            <div className="-mx-4 mb-8 sm:mx-0">
-              <div className="flex gap-1 overflow-x-auto scrollbar-hide border-y border-slate-200/90 bg-slate-50/90 px-4 py-1.5 sm:w-fit sm:rounded-xl sm:border sm:border-slate-200/80 sm:bg-white/70 sm:px-1 sm:py-1 dark:border-white/10 dark:bg-white/[0.03] dark:sm:border-white/10 dark:sm:bg-white/5">
-                {(['lagna', 'moon', 'transit', 'numerology', 'relationships', 'saturn'] as ChartTab[]).map(
-                  tab => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setActiveTab(tab)}
-                      className={[
-                        'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition sm:px-4',
-                        activeTab === tab
-                          ? 'bg-amber-500 text-white shadow-md dark:bg-amber-400 dark:text-slate-900 dark:shadow-amber-400/25'
-                          : 'text-slate-600 hover:bg-white/80 hover:text-slate-900 dark:text-white/55 dark:hover:bg-white/5 dark:hover:text-white/90',
-                      ].join(' ')}
-                    >
-                      <span className="text-base leading-none">{TAB_META[tab].icon}</span>
-                      <span className="hidden sm:inline">{TAB_META[tab].label}</span>
-                      <span className="text-xs sm:hidden">{TAB_META[tab].label.slice(0, 4)}</span>
-                    </button>
-                  ),
-                )}
+            {/* Tab bar — sticky, scrollable, full labels */}
+            <div
+              className="sticky top-14 z-30 -mx-4 mb-6 border-y px-4 backdrop-blur-xl sm:mx-0 sm:rounded-2xl sm:border sm:px-2"
+              style={{ background: 'var(--nav-bg)', borderColor: 'var(--app-border)' }}
+            >
+              <div
+                ref={tabBarRef}
+                role="tablist"
+                aria-label="Chart sections"
+                className="scrollbar-hide flex snap-x gap-1 overflow-x-auto py-2"
+              >
+                {(['lagna', 'moon', 'transit', 'numerology', 'relationships', 'saturn'] as ChartTab[]).map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={[
+                      'flex min-h-11 shrink-0 snap-center items-center gap-2 rounded-xl px-4 text-sm font-semibold transition',
+                      activeTab === tab
+                        ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-slate-900 shadow-md shadow-amber-500/25'
+                        : 'text-slate-600 hover:bg-slate-500/10 dark:text-white/60 dark:hover:text-white',
+                    ].join(' ')}
+                  >
+                    <span aria-hidden className="text-base leading-none">{TAB_META[tab].icon}</span>
+                    {TAB_META[tab].label}
+                  </button>
+                ))}
               </div>
             </div>
+            <p className="-mt-3 mb-5 text-xs text-slate-500 dark:text-white/40">{TAB_META[activeTab].desc}</p>
 
             {lagnaError && (
               <p className="rounded-xl bg-red-100 p-4 text-red-800 dark:bg-red-500/20 dark:text-red-200">
@@ -632,7 +633,7 @@ export default function ChartPage() {
           </>
         )}
 
-      </main>
+      </div>
     </div>
   );
 }

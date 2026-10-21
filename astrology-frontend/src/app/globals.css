@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./design-system.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -45,6 +46,7 @@ html.dark {
   --color-foreground: var(--app-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
 body {

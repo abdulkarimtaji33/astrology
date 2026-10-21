@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { isAxiosError } from 'axios';
+import { AuthCard, AuthShell, ErrorBanner, FieldLabel, PasswordField } from '@/components/auth-ui';
 
 function LoginForm() {
   const { login, user, loading } = useAuth();
@@ -34,36 +35,24 @@ function LoginForm() {
         const d = e.response.data as { message?: string | string[] };
         const m = d.message;
         setErr(Array.isArray(m) ? m.join(', ') : m || 'Login failed');
-      } else setErr('Login failed');
+      } else setErr('Login failed. Check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="app-card relative w-full max-w-md p-8">
-      <div className="mb-8 text-center">
-        <p className="mb-2 text-2xl text-amber-600 dark:text-amber-400/90">✦</p>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Welcome back</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-white/45">Sign in to view your charts and reminders</p>
-      </div>
+    <AuthCard title="Welcome back" subtitle="Sign in to open your charts and reminders">
       <form onSubmit={onSubmit} className="flex flex-col gap-5">
-        {err && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200/90">
-            {err}
-          </div>
-        )}
+        {err && <ErrorBanner>{err}</ErrorBanner>}
         <div>
-          <label
-            htmlFor="login-email"
-            className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-white/40"
-          >
-            Email
-          </label>
+          <FieldLabel htmlFor="login-email">Email</FieldLabel>
           <input
             id="login-email"
             type="email"
+            inputMode="email"
             autoComplete="email"
+            autoCapitalize="none"
             required
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -72,57 +61,29 @@ function LoginForm() {
           />
         </div>
         <div>
-          <label
-            htmlFor="login-password"
-            className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-white/40"
-          >
-            Password
-          </label>
-          <input
-            id="login-password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="app-input"
-          />
+          <FieldLabel htmlFor="login-password">Password</FieldLabel>
+          <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 rounded-xl bg-amber-500 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-amber-600 disabled:opacity-50 dark:bg-amber-400 dark:text-slate-900 dark:hover:bg-amber-300"
-        >
+        <button type="submit" disabled={submitting} className="btn btn-primary btn-block mt-1 min-h-12">
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <p className="mt-6 text-center text-sm text-slate-500 dark:text-white/40">
-        No account?{' '}
-        <Link href="/register" className="font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300/90 dark:hover:text-amber-200">
-          Create one
+      <p className="mt-6 text-center text-sm text-slate-600 dark:text-white/50">
+        New here?{' '}
+        <Link href="/register" className="font-semibold text-amber-700 hover:underline dark:text-amber-300">
+          Create a free account
         </Link>
       </p>
-    </div>
+    </AuthCard>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="app-shell flex items-center justify-center px-4 py-16">
-      <div
-        className="app-shell-glow"
-        style={{
-          backgroundImage: `radial-gradient(ellipse at 30% 20%, var(--glow-2) 0%, transparent 50%),
-            radial-gradient(ellipse at 70% 80%, var(--glow-1) 0%, transparent 45%)`,
-        }}
-      />
-      <Suspense
-        fallback={
-          <div className="relative h-48 w-full max-w-md animate-pulse rounded-2xl border border-slate-200/80 bg-white/60 dark:border-white/10 dark:bg-white/[0.04]" />
-        }
-      >
+    <AuthShell>
+      <Suspense fallback={<div className="skeleton h-96 w-full" />}>
         <LoginForm />
       </Suspense>
-    </div>
+    </AuthShell>
   );
 }

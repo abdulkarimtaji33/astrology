@@ -1,0 +1,343 @@
+/* ═══════════════ Design system v2 ═══════════════ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: 4.5rem;
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+/* Never let iOS zoom on focus; keep every control comfortably tappable */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+@media (min-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 0.9375rem;
+  }
+}
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(245 158 11);
+  outline-offset: 2px;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Starfield behind everything (fixed, cheap: pure gradients) */
+.starfield {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.75), transparent 60%),
+    radial-gradient(1px 1px at 27% 72%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(1.5px 1.5px at 41% 33%, rgba(251, 191, 36, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 58% 12%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 66% 64%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 78% 28%, rgba(165, 180, 252, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 88% 82%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(1px 1px at 93% 44%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 7% 90%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(60rem 40rem at 15% -10%, rgba(99, 102, 241, 0.2), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 20%, rgba(217, 119, 6, 0.1), transparent 60%),
+    var(--app-bg);
+}
+html:not(.dark) .starfield {
+  background:
+    radial-gradient(60rem 40rem at 10% -10%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 10%, rgba(245, 158, 11, 0.12), transparent 60%),
+    var(--app-bg);
+}
+
+.app-shell {
+  min-height: calc(100dvh - 3.5rem);
+  background: transparent !important;
+}
+html.dark .app-shell {
+  background: transparent !important;
+}
+
+/* Cards */
+.app-card {
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 10px 40px -12px rgba(76, 29, 149, 0.18);
+}
+html.dark .app-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 20px 50px -20px rgba(0, 0, 0, 0.6);
+}
+
+.app-input {
+  min-height: 3rem;
+  border-radius: 0.875rem;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.875rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.2s,
+    background 0.2s,
+    border-color 0.2s,
+    filter 0.2s;
+  user-select: none;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  color: #1c1203;
+  background: linear-gradient(135deg, #fcd34d, #f59e0b 55%, #d97706);
+  box-shadow:
+    0 6px 20px -6px rgba(245, 158, 11, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.4) inset;
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow:
+    0 10px 28px -6px rgba(245, 158, 11, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.4) inset;
+  filter: brightness(1.04);
+}
+.btn-secondary {
+  color: var(--app-fg);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--app-border-strong);
+}
+html.dark .btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: rgba(245, 158, 11, 0.55);
+}
+.btn-ghost {
+  color: var(--app-fg-muted);
+  background: transparent;
+}
+.btn-ghost:hover {
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--app-fg);
+}
+.btn-danger {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+.btn-sm {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8125rem;
+  border-radius: 0.7rem;
+}
+.btn-block {
+  width: 100%;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--app-border);
+  background: rgba(127, 127, 127, 0.08);
+  color: var(--app-fg-muted);
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(180 83 9);
+}
+html.dark .eyebrow {
+  color: rgb(252 211 77);
+}
+
+.gold-text {
+  background: linear-gradient(120deg, #fde68a, #f59e0b 50%, #fbbf24);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html:not(.dark) .gold-text {
+  background-image: linear-gradient(120deg, #b45309, #d97706 50%, #92400e);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.fade-up-2 {
+  animation: fade-up 0.5s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.fade-up-3 {
+  animation: fade-up 0.5s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.orbit {
+  animation: orbit 90s linear infinite;
+  transform-origin: center;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  border-radius: 0.9rem;
+  background: linear-gradient(
+    90deg,
+    rgba(127, 127, 127, 0.1) 25%,
+    rgba(127, 127, 127, 0.22) 37%,
+    rgba(127, 127, 127, 0.1) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--nav-bg);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border-top: 1px solid var(--app-border);
+}
+
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Wide tables scroll inside their card instead of breaking the page on phones */
+@media (max-width: 767px) {
+  main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  main .overflow-hidden:has(table) {
+    overflow-x: auto;
+  }
+}
+
+/* Every modal/dialog becomes a bottom sheet on phones */
+@media (max-width: 639px) {
+  .fixed.inset-0.z-50.items-center {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .fixed.inset-0.z-50.items-center > .relative {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 1.5rem !important;
+    border-top-right-radius: 1.5rem !important;
+    max-height: 92dvh !important;
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Room for the bottom tab bar on phones (not on /admin, which hides it) */
+@media (max-width: 767px) {
+  body:not(.is-admin) .app-main {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Scrolling a field/button into view must clear the fixed bottom tab bar */
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}

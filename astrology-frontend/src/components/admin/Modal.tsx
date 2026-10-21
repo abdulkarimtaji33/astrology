@@ -44,17 +44,17 @@ export function Modal({
 
       {/* Panel */}
       <div
-        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-zinc-900 shadow-2xl shadow-black/60 ${
+        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl shadow-black/40 dark:border-white/[0.09] dark:bg-zinc-900 dark:text-white ${
           wide ? "max-w-2xl" : "max-w-lg"
         }`}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.07] px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-white/[0.07]">
+          <h2 className="text-sm font-semibold">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200"
             aria-label="Close"
           >
             <IcoX />

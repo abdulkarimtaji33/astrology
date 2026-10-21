@@ -65,7 +65,9 @@ async function proxy(req: NextRequest, pathSegments: string[]): Promise<Response
       else headers.set(k, String(v));
     }
 
-    return new NextResponse(res.data, {
+    // 204/205/304 must not carry a body or the Response constructor throws
+    const nullBody = [204, 205, 304].includes(res.status);
+    return new NextResponse(nullBody ? null : res.data, {
       status: res.status,
       statusText: res.statusText,
       headers,

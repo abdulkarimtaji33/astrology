@@ -103,39 +103,26 @@ export default function BirthDataForm() {
     }
   };
 
-  const inputClass =
-    'app-input rounded-xl px-4 py-3 [color-scheme:light] dark:[color-scheme:dark]';
+  const inputClass = 'app-input [color-scheme:light] dark:[color-scheme:dark]';
+  const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80';
+  const errClass = 'mt-1.5 text-sm text-red-600 dark:text-red-300';
 
   if (authLoading) {
-    return (
-      <div className="flex h-64 w-full max-w-md animate-pulse flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/60 p-8 dark:border-white/10 dark:bg-white/[0.04]" />
-    );
+    return <div className="skeleton h-96 w-full" />;
   }
 
   if (!user) {
     return (
-      <div className="app-card flex w-full max-w-md flex-col gap-6 p-8">
+      <div className="app-card flex w-full flex-col gap-5 p-6 sm:p-8" style={{ border: '1px solid var(--app-border)' }}>
         <div>
-          <h2 className="text-xl font-medium tracking-wide text-slate-900 dark:text-white/95">
-            Sign in required
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-white/55">
-            Charts are private to your account. Sign in or register to create and open charts.
+          <h2 className="text-2xl font-semibold">Start your chart</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-white/60">
+            Charts are private to your account. Create a free account to generate and save charts.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/login"
-            className="rounded-xl bg-amber-500 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 dark:bg-amber-400 dark:text-slate-900 dark:hover:bg-amber-300"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-xl border border-slate-300 px-5 py-3 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/20 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
-          >
-            Create account
-          </Link>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link href="/register" className="btn btn-primary min-h-12 flex-1">Create free account</Link>
+          <Link href="/login" className="btn btn-secondary min-h-12 flex-1">Sign in</Link>
         </div>
       </div>
     );
@@ -144,104 +131,89 @@ export default function BirthDataForm() {
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="app-card flex w-full max-w-md flex-col gap-6 p-6 sm:p-8"
+      className="app-card flex w-full flex-col gap-6 p-6 sm:p-8"
+      style={{ border: '1px solid var(--app-border)' }}
+      noValidate
     >
       <div>
-        <h2 className="text-xl font-medium tracking-wide text-slate-900 sm:text-2xl dark:text-white/95">
-          Your birth details
-        </h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-white/60">Enter your birth data for a Vedic lagna chart.</p>
+        <h2 className="text-2xl font-semibold">Your birth details</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-white/60">
+          The more exact the time, the more accurate your lagna.
+        </p>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {/* Name */}
+      <div className="flex flex-col gap-5">
         <div>
-          <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
-            Full name
-          </label>
-          <input
-            id="name"
-            type="text"
-            placeholder="e.g. Jane Doe"
-            {...register('name')}
-            className={inputClass}
-          />
-          {errors.name && (
-            <p className="mt-1 text-sm text-amber-700 dark:text-amber-300/90">{errors.name.message}</p>
-          )}
+          <label htmlFor="name" className={labelClass}>Full name</label>
+          <input id="name" type="text" autoComplete="name" placeholder="e.g. Jane Doe" {...register('name')} className={inputClass} />
+          {errors.name && <p className={errClass}>{errors.name.message}</p>}
         </div>
 
-        {/* Date & Time */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2">
           <div>
-            <label htmlFor="birthDate" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
-              Birth date
-            </label>
-            <input
-              id="birthDate"
-              type="date"
-              {...register('birthDate')}
-              className={inputClass}
-            />
-            {errors.birthDate && (
-              <p className="mt-1 text-sm text-amber-700 dark:text-amber-300/90">{errors.birthDate.message}</p>
-            )}
+            <label htmlFor="birthDate" className={labelClass}>Birth date</label>
+            <input id="birthDate" type="date" {...register('birthDate')} className={inputClass} />
+            {errors.birthDate && <p className={errClass}>{errors.birthDate.message}</p>}
           </div>
           <div>
-            <label htmlFor="birthTime" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
-              Birth time
-            </label>
-            <input
-              id="birthTime"
-              type="time"
-              {...register('birthTime')}
-              className={inputClass}
-            />
-            {errors.birthTime && (
-              <p className="mt-1 text-sm text-amber-700 dark:text-amber-300/90">{errors.birthTime.message}</p>
-            )}
+            <label htmlFor="birthTime" className={labelClass}>Birth time</label>
+            <input id="birthTime" type="time" {...register('birthTime')} className={inputClass} />
+            {errors.birthTime && <p className={errClass}>{errors.birthTime.message}</p>}
           </div>
         </div>
 
-        {/* City search */}
         <div className="relative" ref={dropdownRef}>
-          <label htmlFor="citySearch" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-white/80">
-            Birth city
-            <span className="ml-1 font-normal text-slate-500 dark:text-white/40">
-              (optional — for accurate lagna)
-            </span>
+          <label htmlFor="citySearch" className={labelClass}>
+            Birth city <span className="font-normal text-slate-500 dark:text-white/40">· for accurate lagna</span>
           </label>
-          <input
-            id="citySearch"
-            type="text"
-            placeholder="Type city name…"
-            autoComplete="off"
-            value={selectedCity ? `${selectedCity.name}, ${selectedCity.stateCode}, ${selectedCity.countryCode}` : cityQuery}
-            onChange={(e) => {
-              setSelectedCity(null);
-              setCityQuery(e.target.value);
-              searchCities(e.target.value);
-            }}
-            onFocus={() => { if (cityResults.length) setShowDropdown(true); }}
-            className={inputClass}
-          />
+          <div className="relative">
+            <input
+              id="citySearch"
+              type="search"
+              placeholder="Start typing a city…"
+              autoComplete="off"
+              value={selectedCity ? `${selectedCity.name}, ${selectedCity.stateCode}, ${selectedCity.countryCode}` : cityQuery}
+              onChange={(e) => {
+                setSelectedCity(null);
+                setCityQuery(e.target.value);
+                searchCities(e.target.value);
+              }}
+              onFocus={() => { if (cityResults.length) setShowDropdown(true); }}
+              className={`${inputClass} pr-11`}
+            />
+            {(selectedCity || cityQuery) && (
+              <button
+                type="button"
+                aria-label="Clear city"
+                onClick={() => { setSelectedCity(null); setCityQuery(''); setCityResults([]); }}
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-500/10"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
           {showDropdown && cityResults.length > 0 && (
-            <ul className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-white/15 dark:bg-slate-900">
+            <ul className="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-white/15 dark:bg-slate-900">
               {cityResults.map((city) => (
                 <li key={city.id}>
                   <button
                     type="button"
-                    className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:text-white/80 dark:hover:bg-white/10"
+                    className="flex min-h-12 w-full flex-col items-start justify-center rounded-xl px-3 py-2 text-left transition hover:bg-amber-500/10"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       setSelectedCity(city);
                       setCityQuery('');
                       setShowDropdown(false);
                     }}
+                    onClick={() => {
+                      setSelectedCity(city);
+                      setCityQuery('');
+                      setShowDropdown(false);
+                    }}
                   >
-                    <span className="font-medium text-slate-900 dark:text-white">{city.name}</span>
-                    <span className="text-xs text-slate-500 dark:text-white/40">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">{city.name}</span>
+                    <span className="text-xs text-slate-500 dark:text-white/45">
                       {city.stateCode}, {city.countryCode}
                       {city.timezone ? ` · ${city.timezone}` : ''}
                     </span>
@@ -252,35 +224,29 @@ export default function BirthDataForm() {
           )}
 
           {selectedCity && (
-            <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500 dark:text-white/50">
-              <span>
-                lat {parseFloat(selectedCity.latitude).toFixed(4)}, lon{' '}
-                {parseFloat(selectedCity.longitude).toFixed(4)}
-              </span>
-              <button
-                type="button"
-                onClick={() => { setSelectedCity(null); setCityQuery(''); }}
-                className="text-amber-600 transition hover:text-amber-700 dark:text-amber-400/70 dark:hover:text-amber-400"
-              >
-                ✕ clear
-              </button>
-            </div>
+            <p className="chip mt-2">
+              ✓ {parseFloat(selectedCity.latitude).toFixed(2)}°, {parseFloat(selectedCity.longitude).toFixed(2)}°
+              {selectedCity.timezone ? ` · ${selectedCity.timezone}` : ''}
+            </p>
           )}
         </div>
       </div>
 
       {status === 'error' && (
-        <p className="rounded-lg bg-red-100 px-4 py-2 text-sm text-red-800 dark:bg-red-500/20 dark:text-red-200">
+        <p role="alert" className="rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200">
           {errMsg}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={status === 'loading'}
-        className="mt-2 rounded-xl bg-amber-500 px-6 py-3.5 font-medium text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-60 dark:bg-amber-400 dark:text-slate-900 dark:hover:bg-amber-300"
-      >
-        {status === 'loading' ? 'Generating chart…' : 'Generate Birth Chart →'}
+      <button type="submit" disabled={status === 'loading'} className="btn btn-primary btn-block min-h-12 text-base">
+        {status === 'loading' ? (
+          <>
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900/40 border-t-slate-900" />
+            Reading the stars…
+          </>
+        ) : (
+          <>Generate birth chart →</>
+        )}
       </button>
     </form>
   );
